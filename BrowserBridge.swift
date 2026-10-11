@@ -1,6 +1,48 @@
 import Foundation
 import Network
 
+struct RunningChatTask: Equatable, Identifiable {
+    let id: String
+    let title: String
+    let pageURL: String
+    let startedAt: Date
+    let lastSeenAt: Date
+}
+
+struct RunningTaskSnapshot {
+    let tasks: [RunningChatTask]
+    let observedAt: Date
+
+    static func parse(_ obj: [String: Any]) -> RunningTaskSnapshot? {
+        guard let rawTasks = obj["tasks"] as? [[String: Any]], rawTasks.count <= 32 else { return nil }
+        let observedRaw = (obj["observedAt"] as? NSNumber)?.doubleValue ?? Date().timeIntervalSince1970
+        let observedAt = Date(timeIntervalSince1970: observedRaw > 10_000_000_000 ? observedRaw / 1000 : observedRaw)
+        var tasks: [RunningChatTask] = []
+        var seen = Set<String>()
+        for raw in rawTasks {
+            guard let id = raw["id"] as? String, !id.isEmpty, id.count <= 180,
+                  let titleRaw = raw["title"] as? String, titleRaw.count <= 160,
+                  let pageURL = raw["pageURL"] as? String, pageURL.count <= 600,
+                  let url = URL(string: pageURL),
+                  ["chatgpt.com", "chat.openai.com"].contains(url.host?.lowercased() ?? "") else { continue }
+            if seen.contains(id) { continue }
+            seen.insert(id)
+            let startedRaw = (raw["startedAt"] as? NSNumber)?.doubleValue ?? observedRaw
+            let seenRaw = (raw["lastSeenAt"] as? NSNumber)?.doubleValue ?? observedRaw
+            func date(_ value: Double) -> Date {
+                Date(timeIntervalSince1970: value > 10_000_000_000 ? value / 1000 : value)
+            }
+            let title = titleRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+            tasks.append(RunningChatTask(id: id,
+                                         title: title.isEmpty ? "ChatGPT 任务" : title,
+                                         pageURL: pageURL,
+                                         startedAt: date(startedRaw),
+                                         lastSeenAt: date(seenRaw)))
+        }
+        return RunningTaskSnapshot(tasks: tasks.sorted { $0.startedAt < $1.startedAt }, observedAt: observedAt)
+    }
+}
+
 final class BrowserBridge {
     static let port: UInt16 = 18743
     static let pairingKeyName = "TokenDeskBrowserPairingKey_v1"
@@ -19,11 +61,15 @@ final class BrowserBridge {
     private var listener: NWListener?
     private let expectedCode: String
     private let onUsage: (BrowserUsage) -> Void
+    private let onTasks: (RunningTaskSnapshot) -> Void
     private let onState: (String) -> Void
 
-    init(onUsage: @escaping (BrowserUsage) -> Void, onState: @escaping (String) -> Void) {
+    init(onUsage: @escaping (BrowserUsage) -> Void,
+         onTasks: @escaping (RunningTaskSnapshot) -> Void,
+         onState: @escaping (String) -> Void) {
         self.expectedCode = Self.pairingCode
         self.onUsage = onUsage
+        self.onTasks = onTasks
         self.onState = onState
     }
 
@@ -83,7 +129,9 @@ final class BrowserBridge {
             let requestLine = lines.first ?? ""
             // Browsers may preflight requests with a custom X-TokenDesk-Key
             // header. v1.3.1 incorrectly answered 404 to OPTIONS requests.
-            if requestLine == "OPTIONS /ingest HTTP/1.1" || requestLine == "OPTIONS /health HTTP/1.1" {
+            if requestLine == "OPTIONS /ingest HTTP/1.1" ||
+               requestLine == "OPTIONS /tasks HTTP/1.1" ||
+               requestLine == "OPTIONS /health HTTP/1.1" {
                 self.respond(connection, code: 204, message: "No Content", body: "")
                 return
             }
@@ -93,7 +141,9 @@ final class BrowserBridge {
                              body: "{\"ok\":true,\"app\":\"TokenDesk\"}")
                 return
             }
-            guard requestLine == "POST /ingest HTTP/1.1",
+            let isUsagePost = requestLine == "POST /ingest HTTP/1.1"
+            let isTasksPost = requestLine == "POST /tasks HTTP/1.1"
+            guard (isUsagePost || isTasksPost),
                   !lines.dropFirst().contains(where: { $0.lowercased().hasPrefix("transfer-encoding:") })
             else { self.respond(connection, code: 404, message: "Not found"); return }
             let codes = lines.dropFirst().filter { $0.lowercased().hasPrefix("x-tokendesk-key:") }
@@ -108,7 +158,7 @@ final class BrowserBridge {
             }
             let contentLength = lengths[0].split(separator: ":", maxSplits: 1).last.map(String.init)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            guard let length = Int(contentLength), (1...4096).contains(length) else {
+            guard let length = Int(contentLength), (1...16_384).contains(length) else {
                 self.respond(connection, code: 400, message: "Invalid length"); return
             }
             let start = range.upperBound
@@ -118,11 +168,20 @@ final class BrowserBridge {
                 return
             }
             let body = collected.subdata(in: start..<(start + length))
-            guard let obj = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any],
-                  let usage = BrowserUsage.parse(obj) else {
-                self.respond(connection, code: 422, message: "Invalid usage"); return
+            guard let obj = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] else {
+                self.respond(connection, code: 422, message: "Invalid JSON"); return
             }
-            DispatchQueue.main.async { [onUsage] in onUsage(usage) }
+            if isTasksPost {
+                guard let snapshot = RunningTaskSnapshot.parse(obj) else {
+                    self.respond(connection, code: 422, message: "Invalid tasks"); return
+                }
+                DispatchQueue.main.async { [onTasks] in onTasks(snapshot) }
+            } else {
+                guard let usage = BrowserUsage.parse(obj) else {
+                    self.respond(connection, code: 422, message: "Invalid usage"); return
+                }
+                DispatchQueue.main.async { [onUsage] in onUsage(usage) }
+            }
             self.respond(connection, code: 200, message: "OK")
         }
     }
