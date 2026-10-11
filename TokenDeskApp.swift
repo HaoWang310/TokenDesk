@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 import Combine
 
-// TokenDesk v1.6.8 is quota-only.
-// Data path: Chrome extension -> loopback BrowserBridge -> quota history.
+// TokenDesk v1.7.0 monitors quota plus currently running ChatGPT web tasks.
+// Data path: Chrome extension -> loopback BrowserBridge -> quota history + live task state.
 // There is no Codex CLI process launch, ~/.codex log scan, token accounting,
 // Admin Usage API key, or background Codex polling in this build.
 
@@ -95,6 +95,8 @@ private final class TokenModel: ObservableObject {
     @Published var browserUsage: BrowserUsage?
     @Published var browserBridgeState: String = "等待 Chrome 后台连接"
     @Published var quotaHistory: [QuotaHistoryPoint] = []
+    @Published var runningTasks: [RunningChatTask] = []
+    @Published private var taskSnapshotAt: Date?
     @Published var panelHeight: CGFloat = 700
     @Published var showSettings = false
     @Published private var freshnessClock = Date()
@@ -141,6 +143,16 @@ private final class TokenModel: ObservableObject {
 
     func refreshFreshnessClock(_ date: Date = Date()) {
         freshnessClock = date
+        if let taskSnapshotAt, date.timeIntervalSince(taskSnapshotAt) > 75, !runningTasks.isEmpty {
+            runningTasks = []
+        }
+    }
+
+    var runningTaskCount: Int { runningTasks.count }
+
+    func receivedTaskSnapshot(_ value: RunningTaskSnapshot) {
+        taskSnapshotAt = value.observedAt
+        runningTasks = value.tasks
     }
 
     var browserIsFresh: Bool {
@@ -587,6 +599,79 @@ private struct QuotaSummaryCard: View {
     }
 }
 
+private struct RunningTasksSection: View {
+    let tasks: [RunningChatTask]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("运行任务")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.78))
+                Spacer()
+                Text(tasks.isEmpty ? "0" : "\(tasks.count) 运行中")
+                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    .foregroundColor(tasks.isEmpty ? .white.opacity(0.38) : Color(red: 0.42, green: 0.88, blue: 0.75))
+            }
+
+            if tasks.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle")
+                        .foregroundColor(.white.opacity(0.38))
+                    Text("当前没有检测到正在运行的 ChatGPT 网页任务")
+                        .font(.system(size: 10.5))
+                        .foregroundColor(.white.opacity(0.42))
+                    Spacer()
+                }
+                .padding(12)
+                .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
+            } else {
+                VStack(spacing: 7) {
+                    ForEach(tasks.prefix(8)) { task in
+                        taskRow(task)
+                    }
+                }
+            }
+        }
+    }
+
+    private func taskRow(_ task: RunningChatTask) -> some View {
+        Button {
+            if let url = URL(string: task.pageURL) { NSWorkspace.shared.open(url) }
+        } label: {
+            HStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(Color(red: 0.42, green: 0.88, blue: 0.75))
+                    .frame(width: 16)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(task.title)
+                        .font(.system(size: 10.8, weight: .medium))
+                        .foregroundColor(.white.opacity(0.86))
+                        .lineLimit(1)
+                    Text("已运行 " + elapsed(task.startedAt))
+                        .font(.system(size: 9.5, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.38))
+                }
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.28))
+            }
+            .padding(10)
+            .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 11))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func elapsed(_ start: Date) -> String {
+        let seconds = max(0, Int(Date().timeIntervalSince(start)))
+        if seconds < 60 { return "\(seconds)秒" }
+        if seconds < 3600 { return "\(seconds / 60)分\(seconds % 60)秒" }
+        return "\(seconds / 3600)时\((seconds % 3600) / 60)分"
+    }
+}
+
 private struct TokenDeskSettingsView: View {
     @ObservedObject var model: TokenModel
     let setPinned: (Bool) -> Void
@@ -672,7 +757,7 @@ private struct TokenDeskSettingsView: View {
                 .font(.system(size: 11))
                 .foregroundColor(.white.opacity(0.58))
                 .fixedSize(horizontal: false, vertical: true)
-            Text("v1.6.8 将额度历史改为自适应时间轴：历史不足 24 小时时按实际记录时长展开，满 24 小时后固定显示最近 24 小时；后台同步逻辑保持不变。")
+            Text("v1.7.0 新增运行任务监控：跨 Chrome 中已打开的 ChatGPT 标签页汇总正在生成 / 思考 / 执行的任务，任务完成或停止后自动从列表移除。")
                 .font(.system(size: 10.5))
                 .foregroundColor(.white.opacity(0.43))
                 .fixedSize(horizontal: false, vertical: true)
@@ -705,6 +790,8 @@ private struct TokenDeskScrollContent: View {
             QuotaSummaryCard(snapshot: model.activeQuota,
                              sourceText: model.activeQuotaSource,
                              isStale: model.activeQuotaIsStale)
+                .padding(.bottom, 15)
+            RunningTasksSection(tasks: model.runningTasks)
                 .padding(.bottom, 15)
             QuotaHistorySection(points: model.quotaHistory,
                                 points24h: model.quotaHistory24h,
@@ -785,6 +872,7 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
     private var weeklyItem: NSMenuItem!
     private var resetsItem: NSMenuItem!
     private var quotaStateItem: NSMenuItem!
+    private var taskCountItem: NSMenuItem!
     private var browserBridge: BrowserBridge?
     private let panelWidth: CGFloat = 360
     private let maximumPanelHeight: CGFloat = 740
@@ -828,7 +916,8 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
         weeklyItem = NSMenuItem(title: "每周额度：—", action: nil, keyEquivalent: "")
         resetsItem = NSMenuItem(title: "可用重置：—", action: nil, keyEquivalent: "")
         quotaStateItem = NSMenuItem(title: "额度未连接", action: nil, keyEquivalent: "")
-        [fiveHourItem!, weeklyItem!, resetsItem!, quotaStateItem!].forEach { menu.addItem($0) }
+        taskCountItem = NSMenuItem(title: "运行任务：0", action: nil, keyEquivalent: "")
+        [fiveHourItem!, weeklyItem!, resetsItem!, taskCountItem!, quotaStateItem!].forEach { menu.addItem($0) }
         menu.addItem(.separator())
         menu.addItem(withTitle: "显示 / 隐藏面板", action: #selector(togglePanel), keyEquivalent: "")
         menu.addItem(withTitle: "重置面板位置并显示", action: #selector(resetPanelLocation), keyEquivalent: "")
@@ -860,6 +949,10 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
         browserBridge = BrowserBridge(
             onUsage: { [weak self] reading in
                 self?.model.receivedBrowserUsage(reading)
+                self?.updateMenuBar()
+            },
+            onTasks: { [weak self] snapshot in
+                self?.model.receivedTaskSnapshot(snapshot)
                 self?.updateMenuBar()
             },
             onState: { [weak self] state in self?.model.browserBridgeState = state }
@@ -915,7 +1008,7 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
         let stale = model.activeQuotaIsStale
         let statusPrefix = stale ? "⚠ " : (model.browserIsFresh ? "🌐 " : "")
         status.button?.attributedTitle = NSAttributedString(
-            string: "\(statusPrefix)5h \(f) · 周 \(w)",
+            string: "\(statusPrefix)5h \(f) · 周 \(w) · 任务 \(model.runningTaskCount)",
             attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold),
                          .foregroundColor: stale || critical ? NSColor.systemOrange : NSColor.labelColor]
         )
@@ -927,6 +1020,7 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
         fiveHourItem.title = line("5 小时剩余", quota?.fiveHour)
         weeklyItem.title = line("每周剩余", quota?.weekly)
         resetsItem.title = quota?.availableResets.map { "可用重置：\($0) 次" } ?? "可用重置：—"
+        taskCountItem.title = "运行任务：\(model.runningTaskCount)"
         quotaStateItem.title = model.activeQuotaSource
         status.button?.toolTip = "ChatGPT 剩余额度（非 Token） · " + model.activeQuotaSource
     }
