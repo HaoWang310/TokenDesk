@@ -1,4 +1,4 @@
-# TokenDesk Mac v1.6.8 自适应历史图表版
+# TokenDesk Mac v1.7.0 运行任务监控版
 
 TokenDesk 是 macOS 菜单栏 ChatGPT Work / Codex 剩余额度监控器。
 
@@ -6,7 +6,7 @@ TokenDesk 是 macOS 菜单栏 ChatGPT Work / Codex 剩余额度监控器。
 
 **Chrome 后台主动查询 → 本机 TokenDesk → 菜单栏 / 浮窗 / 额度历史**
 
-## v1.6.8 更新
+## v1.7.0 更新
 
 - 修复安装时的 `Invalid Iconset`：安装包直接携带有效的 `TokenDesk.icns`，不再在用户 Mac 上临时调用 `iconutil` 生成图标。
 - Finder / `~/Applications` 中使用稳定的 TokenDesk App 图标。
@@ -40,7 +40,7 @@ TokenDesk 是 macOS 菜单栏 ChatGPT Work / Codex 剩余额度监控器。
 1. 解压 ZIP。
 2. 推荐在终端直接运行 `bash "/完整路径/安装到Mac.command"`。不要先单独输入 `bash` 再直接执行 `.command` 文件。
 3. Chrome 打开 `chrome://extensions`。
-4. 找到 **TokenDesk 网页额度同步** → **重新加载**，确认版本为 `1.6.8`。
+4. 找到 **TokenDesk 网页额度同步** → **重新加载**，确认版本为 `1.7.0`。
 5. 原配对码通常继续有效；若显示未配对，从 Mac TokenDesk 设置中重新复制并保存即可。
 6. 点一次扩展里的 **立即后台查询** 验证。
 
