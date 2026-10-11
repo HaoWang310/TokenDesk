@@ -1,7 +1,0 @@
-TokenDesk v1.6.7 Swift 编译器兼容修复版
-
-- 将 TokenDesk 主窗口的巨大 SwiftUI ViewBuilder 彻底拆分为 Header / ScrollContent / QuotaSummary / Settings / Footer 独立 View。
-- 进一步拆分 QuotaBarRow，降低 GeometryReader + 条件渲染对类型推断器的压力。
-- 安装日志每次重新生成，不再追加旧日志，避免把旧版本的编译错误误认为当前安装错误。
-- 安装日志明确打印“安装源目录”，可以确认实际编译的是哪个解压目录。
-- 功能保持不变：Chrome 后台额度查询、5h/周额度、重置时间、额度历史、旧数据恢复、90 秒过期提示。
