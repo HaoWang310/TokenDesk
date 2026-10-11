@@ -3,14 +3,11 @@
   if (globalThis.__TOKEN_DESK_NETWORK_HOOK__) return;
   globalThis.__TOKEN_DESK_NETWORK_HOOK__ = true;
 
-  // Runs in ChatGPT's MAIN world. It only inspects the JSON response body of
-  // the first-party usage endpoint. It never reads cookies or header values,
-  // and never forwards an Authorization header outside the page.
   const CHANNEL = 'TOKEN_DESK_NETWORK_V1';
   const USAGE_PATHS = ['/backend-api/wham/usage', '/api/codex/usage'];
   const nativeFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
   const NativeXHR = window.XMLHttpRequest;
-  let requestTemplate = null; // opaque Request clone; header values are never inspected
+  let requestTemplate = null;
   let lastPayload = null;
   let refreshBusy = false;
 
@@ -46,11 +43,7 @@
     if (Math.abs(seconds - 18_000) <= 1_800) kind = 'five';
     if (Math.abs(seconds - 604_800) <= 60_480) kind = 'week';
     if (!kind) return null;
-    return {
-      kind,
-      remaining: clampPct(100 - used),
-      resetAt: reset && reset > 0 ? Math.round(reset) : null
-    };
+    return { kind, remaining: clampPct(100 - used), resetAt: reset && reset > 0 ? Math.round(reset) : null };
   }
 
   function parseUsageJSON(root, endpoint) {
@@ -74,9 +67,7 @@
     const credits = pick(root, 'rate_limit_reset_credits', 'rateLimitResetCredits') ||
       pick(group, 'rate_limit_reset_credits', 'rateLimitResetCredits');
     const available = finiteNumber(pick(credits, 'available_count', 'availableCount'));
-    if (available !== null && Number.isInteger(available) && available >= 0 && available <= 20) {
-      payload.availableResets = available;
-    }
+    if (available !== null && Number.isInteger(available) && available >= 0 && available <= 20) payload.availableResets = available;
     if (!Number.isInteger(payload.fiveHourRemaining) && !Number.isInteger(payload.weeklyRemaining)) return null;
     return payload;
   }
@@ -84,13 +75,11 @@
   function emit(type, extra = {}) {
     window.postMessage({ channel: CHANNEL, type, ...extra }, location.origin);
   }
-
   function publish(payload) {
     if (!payload) return;
     lastPayload = payload;
     emit('USAGE', { payload });
   }
-
   async function inspectResponse(response, url) {
     try {
       if (!response || !response.ok || !isUsageURL(url)) return;
@@ -98,22 +87,18 @@
       if (!text || text.length > 512_000) return;
       const payload = parseUsageJSON(JSON.parse(text), new URL(String(url), location.href).pathname);
       publish(payload);
-    } catch { /* quota capture must never affect ChatGPT */ }
+    } catch {}
   }
-
   function rememberFetchRequest(input, init) {
     if (!nativeFetch) return;
     try {
-      const req = input instanceof Request
-        ? new Request(input, init)
-        : new Request(new URL(String(input), location.href).href, init);
+      const req = input instanceof Request ? new Request(input, init) : new Request(new URL(String(input), location.href).href, init);
       if (req.method === 'GET' && isUsageURL(req.url)) {
         requestTemplate = req.clone();
         emit('READY', { ready: true });
       }
-    } catch { /* no-op */ }
+    } catch {}
   }
-
   async function replayUsageRequest() {
     if (!nativeFetch || !requestTemplate || refreshBusy) {
       emit('READY', { ready: !!requestTemplate });
@@ -127,7 +112,7 @@
         requestTemplate = null;
         emit('READY', { ready: false, authExpired: true });
       }
-    } catch { }
+    } catch {}
     finally { refreshBusy = false; }
   }
 
