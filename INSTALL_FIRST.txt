@@ -1,0 +1,13 @@
+TokenDesk v1.7.0 installation
+
+Recommended Terminal install:
+
+  bash "/full/path/to/TokenDesk_v1.7.0/install.command"
+
+Then open Chrome:
+  chrome://extensions
+
+Reload / load the TokenDesk extension from:
+  ~/Library/Application Support/TokenDesk/Chrome_Extension
+
+v1.7.0 adds live running-task monitoring for open ChatGPT Chrome tabs.
