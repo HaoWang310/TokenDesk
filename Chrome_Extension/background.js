@@ -2,6 +2,7 @@
 
 const ORIGIN = 'http://127.0.0.1:18743';
 const SERVER = ORIGIN + '/ingest';
+const TASK_SERVER = ORIGIN + '/tasks';
 const CHATGPT_ORIGIN = 'https://chatgpt.com';
 const SESSION_URL = CHATGPT_ORIGIN + '/api/auth/session';
 const USAGE_URLS = [
@@ -135,6 +136,90 @@ async function sendUsage(payload) {
     await chrome.storage.local.set({syncStatus:message});
     return {ok:false,message};
   } finally {clearTimeout(t);}
+}
+
+
+const taskStates = new Map();
+let taskPublishTimer = null;
+
+function validChatGPTURL(value) {
+  return typeof value === 'string' && value.length <= 600 && /^https:\/\/(?:chatgpt\.com|chat\.openai\.com)(?:\/|$)/.test(value);
+}
+
+function sanitizeTaskMessage(message, sender) {
+  if (!Number.isInteger(sender?.tab?.id) || !validChatGPTURL(sender?.url || '')) return null;
+  const p = message?.payload || {};
+  if (typeof p.active !== 'boolean' || typeof p.id !== 'string' || !p.id || p.id.length > 180) return null;
+  if (!validChatGPTURL(p.pageURL || sender.url || '')) return null;
+  const now = Date.now();
+  const started = Number.isFinite(Number(p.startedAt)) ? Number(p.startedAt) * 1000 : now;
+  const seen = Number.isFinite(Number(p.lastSeenAt)) ? Number(p.lastSeenAt) * 1000 : now;
+  return {
+    tabId: sender.tab.id,
+    id: p.id,
+    active: p.active,
+    title: typeof p.title === 'string' ? p.title.replace(/\s+/g,' ').trim().slice(0,100) : 'ChatGPT 任务',
+    pageURL: (p.pageURL || sender.url).slice(0,500),
+    startedAt: Math.min(now, Math.max(now - 7 * 24 * 60 * 60 * 1000, started)),
+    lastSeenAt: Math.min(now + 5000, Math.max(now - 5 * 60 * 1000, seen))
+  };
+}
+
+function currentTasks() {
+  const now = Date.now();
+  const dedup = new Map();
+  for (const [tabId, task] of taskStates) {
+    if (!task.active || now - task.lastSeenAt > 90_000) { taskStates.delete(tabId); continue; }
+    const existing = dedup.get(task.id);
+    if (!existing || task.lastSeenAt > existing.lastSeenAt) dedup.set(task.id, task);
+  }
+  return [...dedup.values()].sort((a,b)=>a.startedAt-b.startedAt).slice(0,20);
+}
+
+async function sendTasksSnapshot() {
+  const {pairingCode} = await chrome.storage.local.get({pairingCode:''});
+  if (!/^[0-9a-f]{64}$/i.test(pairingCode)) return {ok:false,message:'任务监控等待配对。'};
+  const tasks = currentTasks();
+  const payload = {
+    observedAt: Math.floor(Date.now()/1000),
+    tasks: tasks.map(t=>({
+      id:t.id,title:t.title || 'ChatGPT 任务',pageURL:t.pageURL,
+      startedAt:Math.floor(t.startedAt/1000),lastSeenAt:Math.floor(t.lastSeenAt/1000)
+    }))
+  };
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(),5000);
+  try {
+    const response = await fetch(TASK_SERVER,{
+      method:'POST',cache:'no-store',
+      headers:{'Content-Type':'application/json','X-TokenDesk-Key':pairingCode},
+      body:JSON.stringify(payload),signal:controller.signal
+    });
+    const message = response.ok ? `运行任务已同步：${tasks.length} 个` : `任务同步失败：HTTP ${response.status}`;
+    await chrome.storage.local.set({taskSyncStatus:message, runningTaskCount:tasks.length, taskLastSync:Date.now()});
+    return {ok:response.ok,message,count:tasks.length};
+  } catch {
+    return {ok:false,message:'无法将运行任务发送给 Mac。'};
+  } finally { clearTimeout(timer); }
+}
+
+function scheduleTaskPublish() {
+  if (taskPublishTimer) clearTimeout(taskPublishTimer);
+  taskPublishTimer = setTimeout(()=>{ taskPublishTimer=null; sendTasksSnapshot().catch(()=>{}); },120);
+}
+
+async function refreshTaskTabs(inject = false) {
+  try {
+    const tabs = await chrome.tabs.query({url:['https://chatgpt.com/*','https://chat.openai.com/*']});
+    for (const tab of tabs) {
+      if (!tab.id) continue;
+      if (inject && chrome.scripting?.executeScript) {
+        await chrome.scripting.executeScript({target:{tabId:tab.id},files:['task-monitor.js']}).catch(()=>{});
+      }
+      chrome.tabs.sendMessage(tab.id,{type:'TOKEN_DESK_TASK_REFRESH'}).catch(()=>{});
+    }
+  } catch {}
+  setTimeout(()=>sendTasksSnapshot().catch(()=>{}),500);
 }
 
 function sanitizeMessage(message, sender) {
@@ -283,6 +368,15 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
     backgroundQuotaRefresh('manual').then(sendResponse).catch(e=>sendResponse({ok:false,message:String(e)}));
     return true;
   }
+  if(message?.type==='TOKEN_DESK_TASK_STATE') {
+    const task = sanitizeTaskMessage(message, sender);
+    if (!task) return false;
+    if (task.active) taskStates.set(task.tabId, task);
+    else taskStates.delete(task.tabId);
+    scheduleTaskPublish();
+    sendResponse({ok:true,count:currentTasks().length});
+    return false;
+  }
   if(message?.type!=='TOKEN_DESK_WEB_USAGE') return false;
   const data = sanitizeMessage(message, sender);
   if (!data) return false;
@@ -297,20 +391,36 @@ function installAlarm() {
 chrome.runtime.onInstalled.addListener(()=>{
   installAlarm();
   backgroundQuotaRefresh('installed').catch(()=>{});
+  refreshTaskTabs(true).catch(()=>{});
 });
 chrome.runtime.onStartup.addListener(()=>{
   installAlarm();
   backgroundQuotaRefresh('startup').catch(()=>{});
+  refreshTaskTabs(true).catch(()=>{});
 });
+if (chrome.tabs?.onRemoved) {
+  chrome.tabs.onRemoved.addListener(tabId=>{
+    if (taskStates.delete(tabId)) scheduleTaskPublish();
+  });
+}
+if (chrome.tabs?.onUpdated) {
+  chrome.tabs.onUpdated.addListener((tabId,changeInfo)=>{
+    if (changeInfo.status==='loading' || changeInfo.url) {
+      if (taskStates.delete(tabId)) scheduleTaskPublish();
+    }
+  });
+}
 chrome.alarms.onAlarm.addListener(async alarm=>{
   if(alarm.name!=='tokendesk-quota-refresh') return;
   const result = await backgroundQuotaRefresh('alarm');
   if (!result.ok) await refreshChatGPTTabs();
+  await refreshTaskTabs(false);
 });
 
 // Ensure an unpacked extension reloaded during development also has an alarm.
 installAlarm();
 backgroundQuotaRefresh('service-worker-load').catch(()=>{});
+refreshTaskTabs(true).catch(()=>{});
 
 // Test hooks used only by the bundled Node test; harmless in Chrome.
 if (globalThis.__TOKEN_DESK_TEST__) {
