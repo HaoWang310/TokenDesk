@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import Combine
 
-// TokenDesk v1.6.7 is quota-only.
+// TokenDesk v1.6.8 is quota-only.
 // Data path: Chrome extension -> loopback BrowserBridge -> quota history.
 // There is no Codex CLI process launch, ~/.codex log scan, token accounting,
 // Admin Usage API key, or background Codex polling in this build.
@@ -201,22 +201,35 @@ private final class TokenModel: ObservableObject {
 
 private struct QuotaHistoryChart: View {
     let points: [QuotaHistoryPoint]
+    let startDate: Date
+    let endDate: Date
 
     private let fiveColor = Color(red: 0.42, green: 0.88, blue: 0.75)
     private let weekColor = Color(red: 0.54, green: 0.69, blue: 1.00)
 
+    private var span: TimeInterval {
+        max(60, endDate.timeIntervalSince(startDate))
+    }
+
+    private func pointPosition(size: CGSize, point: QuotaHistoryPoint, raw: Int) -> CGPoint {
+        let percent = min(100, max(0, raw))
+        let elapsed = point.timestamp.timeIntervalSince(startDate)
+        let ratio = min(1, max(0, elapsed / span))
+        let x = size.width * CGFloat(ratio)
+        let y = size.height * (1 - CGFloat(percent) / 100)
+        return CGPoint(x: x, y: y)
+    }
+
     private func chartPath(size: CGSize, value: (QuotaHistoryPoint) -> Int?) -> Path {
-        let end = Date().timeIntervalSince1970
-        let start = end - 24 * 60 * 60
         var path = Path()
         var drawing = false
         for point in points {
-            guard let raw = value(point) else { drawing = false; continue }
-            let percent = min(100, max(0, raw))
-            let ratio = min(1, max(0, (point.timestamp.timeIntervalSince1970 - start) / (end - start)))
-            let x = size.width * CGFloat(ratio)
-            let y = size.height * (1 - CGFloat(percent) / 100)
-            let p = CGPoint(x: x, y: y)
+            guard point.timestamp >= startDate && point.timestamp <= endDate,
+                  let raw = value(point) else {
+                drawing = false
+                continue
+            }
+            let p = pointPosition(size: size, point: point, raw: raw)
             if drawing { path.addLine(to: p) } else { path.move(to: p); drawing = true }
         }
         return path
@@ -224,6 +237,7 @@ private struct QuotaHistoryChart: View {
 
     var body: some View {
         GeometryReader { geo in
+            let dotStride = max(1, points.count / 48)
             ZStack {
                 ForEach([0.25, 0.5, 0.75], id: \.self) { fraction in
                     Path { p in
@@ -233,10 +247,26 @@ private struct QuotaHistoryChart: View {
                     }
                     .stroke(Color.white.opacity(0.07), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
                 }
+
                 chartPath(size: geo.size, value: { $0.weeklyRemaining })
                     .stroke(weekColor, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                 chartPath(size: geo.size, value: { $0.fiveHourRemaining })
                     .stroke(fiveColor, style: StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round))
+
+                ForEach(Array(points.enumerated()), id: \.offset) { index, point in
+                    if (index % dotStride == 0 || index == points.count - 1),
+                       point.timestamp >= startDate, point.timestamp <= endDate {
+                        if let raw = point.weeklyRemaining {
+                            let p = pointPosition(size: geo.size, point: point, raw: raw)
+                            Circle().fill(weekColor).frame(width: 4, height: 4).position(p)
+                        }
+                        if let raw = point.fiveHourRemaining {
+                            let p = pointPosition(size: geo.size, point: point, raw: raw)
+                            Circle().fill(fiveColor).frame(width: 4.5, height: 4.5).position(p)
+                        }
+                    }
+                }
+
                 if points.count < 2 {
                     Text(points.isEmpty ? "等待后台同步后开始记录" : "已记录第一个额度点")
                         .font(.system(size: 10))
@@ -252,6 +282,26 @@ private struct QuotaHistorySection: View {
     let points24h: [QuotaHistoryPoint]
     let fiveHourMinimum24h: Int?
     let weeklyMinimum24h: Int?
+
+    private var chartEnd: Date { Date() }
+
+    private var chartWindow: TimeInterval {
+        guard let first = points24h.first?.timestamp else { return 30 * 60 }
+        let observed = max(0, chartEnd.timeIntervalSince(first))
+        if observed >= 23.5 * 60 * 60 { return 24 * 60 * 60 }
+        if observed < 60 * 60 { return min(24 * 60 * 60, max(30 * 60, observed * 1.12)) }
+        return min(24 * 60 * 60, max(60 * 60, observed * 1.05))
+    }
+
+    private var chartStart: Date { chartEnd.addingTimeInterval(-chartWindow) }
+
+    private var chartTitle: String {
+        if chartWindow >= 23.5 * 60 * 60 { return "最近 24 小时" }
+        if chartWindow >= 60 * 60 {
+            return "最近 \(max(1, Int(ceil(chartWindow / 3600)))) 小时"
+        }
+        return "最近 \(max(1, Int(ceil(chartWindow / 60)))) 分钟"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -285,15 +335,22 @@ private struct QuotaHistorySection: View {
     private var chartCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("最近 24 小时")
+                Text(chartTitle)
                     .font(.system(size: 10.5, weight: .semibold))
                     .foregroundColor(.white.opacity(0.56))
                 Spacer()
                 legend(color: Color(red: 0.42, green: 0.88, blue: 0.75), text: "5h")
                 legend(color: Color(red: 0.54, green: 0.69, blue: 1.00), text: "每周")
             }
-            QuotaHistoryChart(points: points24h)
+            QuotaHistoryChart(points: points24h, startDate: chartStart, endDate: chartEnd)
                 .frame(height: 118)
+            HStack {
+                Text(chartStart.formatted(date: .omitted, time: .shortened))
+                Spacer()
+                Text("现在")
+            }
+            .font(.system(size: 9, design: .monospaced))
+            .foregroundColor(.white.opacity(0.30))
         }
         .padding(12)
         .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
@@ -615,7 +672,7 @@ private struct TokenDeskSettingsView: View {
                 .font(.system(size: 11))
                 .foregroundColor(.white.opacity(0.58))
                 .fixedSize(horizontal: false, vertical: true)
-            Text("v1.6.7 保留稳定的 Chrome 后台额度同步与额度历史，并修复 App 图标安装和菜单栏图标；Codex CLI、Usage API 与旧 Token 统计仍保持移除。")
+            Text("v1.6.8 将额度历史改为自适应时间轴：历史不足 24 小时时按实际记录时长展开，满 24 小时后固定显示最近 24 小时；后台同步逻辑保持不变。")
                 .font(.system(size: 10.5))
                 .foregroundColor(.white.opacity(0.43))
                 .fixedSize(horizontal: false, vertical: true)
