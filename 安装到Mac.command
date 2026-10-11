@@ -87,6 +87,9 @@ else
 fi
 
 printf '[3/5] 清理下载标记并签名…\n'
+# Clear all extended attributes from this locally generated app, not just
+# com.apple.quarantine. This also avoids downloaded-source provenance being
+# carried into the app bundle on newer macOS releases.
 /usr/bin/xattr -cr "$STAGE_APP" 2>/dev/null || true
 /usr/bin/codesign --force --deep --sign - "$STAGE_APP"
 /usr/bin/codesign --verify --deep --strict "$STAGE_APP"
@@ -108,10 +111,12 @@ if [[ -d "$TARGET_APP" ]]; then
 fi
 mv "$STAGE_APP" "$TARGET_APP"
 
+# Final-path cleanup + re-sign. Doing this after the move is intentional.
 /usr/bin/xattr -cr "$TARGET_APP" 2>/dev/null || true
 /usr/bin/codesign --force --deep --sign - "$TARGET_APP"
 /usr/bin/codesign --verify --deep --strict "$TARGET_APP"
 
+# Stable Chrome extension install.
 if [[ -d "$SOURCE_DIR/Chrome_Extension" ]]; then
   EXT_FOLDER="$HOME/Library/Application Support/TokenDesk/Chrome_Extension"
   EXT_PARENT="$(dirname "$EXT_FOLDER")"
@@ -127,6 +132,9 @@ if [[ -d "$SOURCE_DIR/Chrome_Extension" ]]; then
 fi
 
 printf '[5/5] 首次启动…\n'
+# Do NOT use `open` for the first launch. `open` invokes LaunchServices and
+# Gatekeeper's downloaded-app path. The user has explicitly run this installer
+# in Terminal, so start the locally-built executable directly after xattr clear.
 LAUNCH_LOG="$HOME/Library/Logs/TokenDesk_launch.log"
 mkdir -p "$(dirname "$LAUNCH_LOG")"
 /usr/bin/nohup "$TARGET_APP/Contents/MacOS/TokenDesk" >"$LAUNCH_LOG" 2>&1 &
