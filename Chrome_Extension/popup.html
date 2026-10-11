@@ -1,0 +1,14 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+button{margin-top:6px!important}body{font:13px -apple-system,BlinkMacSystemFont,Arial,sans-serif;color:#ecf6f6;background:#151d2b;margin:0;padding:17px;width:320px;box-sizing:border-box}h2{margin:0 0 12px;font-size:16px}p{line-height:1.6;color:#b7c8cf}input{box-sizing:border-box;width:100%;padding:9px;border:1px solid #65757f;border-radius:7px;background:#222f41;color:#fff;margin:6px 0 9px}button{background:#41c7ab;border:0;padding:9px 12px;border-radius:7px;cursor:pointer;font-weight:600;color:#0d2126}button.secondary{background:#374a5b;color:#fff;margin-left:5px}.state{background:#273649;padding:9px;border-radius:7px;margin-top:10px;line-height:1.6;font-size:12px}b{color:#f3fbfb}
+</style></head><body>
+<h2>🌐 TokenDesk 网页额度</h2>
+<p>从 Mac TokenDesk 复制配对码并保存。配对码只连接本机，不是 ChatGPT 密码。</p>
+<input id="key" type="password" placeholder="粘贴本机配对码" autocomplete="off" spellcheck="false">
+<button id="save">保存配对</button><button id="health" class="secondary">测试本机连接</button><button id="scan" class="secondary">立即后台查询</button>
+<div class="state" id="state">正在检查...</div>
+<div class="state" id="last" aria-live="polite">正在读取历史同步状态...</div>
+<p><b>v1.6.2 Chrome 后台主动查询：</b>只要 Chrome 正在运行并且仍登录 ChatGPT，扩展会约每 30 秒查询一次额度。<b>不需要打开 ChatGPT，也不需要打开“设置 → 用量”。</b></p>
+<p>后台请求只解析 5 小时 / 每周剩余额度、重置时间和可用重置次数。登录会话只在 Chrome 内使用；TokenDesk Mac 端不会收到 Cookie、密码、聊天正文或访问令牌。</p>
+<p>如果后台主动查询因网页登录状态或官方接口变化失败，已打开的 ChatGPT 标签页仍会作为备用监听来源。</p>
+<script src="popup.js"></script></body></html>
