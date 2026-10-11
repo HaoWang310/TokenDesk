@@ -15,6 +15,7 @@ mkdir -p "$PARENT"
 rm -rf -- "$STAGE"
 mkdir -p "$STAGE"
 cp -R "$SRC/." "$STAGE/"
+# Clean replacement: remove obsolete files from older extension versions.
 rm -rf -- "$DST"
 mv "$STAGE" "$DST"
 echo ''
