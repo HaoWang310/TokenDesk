@@ -43,6 +43,7 @@
     return {ok:true};
   }
 
+  // MAIN-world network hook sends ONLY sanitized quota fields through postMessage.
   window.addEventListener('message', event => {
     if (event.source !== window || event.origin !== location.origin) return;
     const m=event.data;
@@ -66,6 +67,8 @@
     window.postMessage({channel:CHANNEL,type:'REPLAY_LAST'}, location.origin);
   }
 
+  // ----- DOM fallback -----
+  // This remains as a fallback only. Chrome service-worker background query is preferred in v1.6.2.
   function percentFromCard(card) {
     const t = clean(card);
     const labeled = [
