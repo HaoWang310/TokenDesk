@@ -11,38 +11,44 @@ TokenDesk keeps a small macOS menu-bar panel showing:
 - 5-hour remaining usage quota
 - weekly remaining usage quota
 - reset times and available resets when reported by ChatGPT
-- recent quota history (stored locally on the Mac)
-- last sync state / stale-data state
+- recent quota history stored locally on the Mac
+- last-sync and stale-data state
 
-The current data path is:
+Current data path:
 
 **Chrome background query → local TokenDesk app → menu bar / floating panel / quota history**
 
-Chrome can stay in the background. After first pairing, you do **not** need to keep the ChatGPT Usage page open.
+After the first pairing, Chrome can stay in the background. You do **not** need to keep ChatGPT or the Usage page open.
 
-## v1.6.7
+## Current version: v1.6.7
 
-- stable local macOS install flow
-- Chrome background polling (about every 30 seconds)
-- no Codex CLI / npm dependency
+- Chrome background polling, about every 30 seconds
+- no Codex CLI, Node.js, or npm dependency
 - no local `.codex` log scanning
-- no token-count dashboard or Admin Usage API key
+- no token-count dashboard
+- no Admin Usage API key
 - local 7-day quota history
-- stale-data detection after the browser stops syncing
-- fixed app icon and adaptive macOS menu-bar icon
+- stale-data detection when Chrome stops syncing
+- local macOS build/install flow
+- adaptive macOS menu-bar icon
 
-## Installation
+## Install
 
-### 1. Download
+### 1. Download the repository
 
-Download `dist/TokenDesk_Mac_v1.6.7.zip` after the repository files are published.
+Use GitHub **Code → Download ZIP**, or clone it:
+
+```bash
+git clone https://github.com/HaoWang310/TokenDesk.git
+cd TokenDesk
+```
 
 ### 2. Install the macOS app
 
 Run the installer through Terminal:
 
 ```bash
-bash "/full/path/to/TokenDesk_v1.6.7/安装到Mac.command"
+bash "/full/path/to/TokenDesk/安装到Mac.command"
 ```
 
 The app installs to:
@@ -51,7 +57,15 @@ The app installs to:
 ~/Applications/TokenDesk.app
 ```
 
-### 3. Load / reload the Chrome extension
+The installer builds the Swift app locally and uses an ad-hoc local signature. This repository is **not** an Apple Developer ID / notarized distribution.
+
+### 3. Load the Chrome extension
+
+The installer copies the extension to:
+
+```text
+~/Library/Application Support/TokenDesk/Chrome_Extension
+```
 
 Open:
 
@@ -59,30 +73,38 @@ Open:
 chrome://extensions
 ```
 
-Enable **Developer mode**, load the unpacked extension from the folder shown by TokenDesk, or reload the existing **TokenDesk 网页额度同步** extension.
+Turn on **Developer mode**, choose **Load unpacked**, and select that folder. If the extension is already installed, click **Reload**.
 
 ### 4. Pair once
 
-Copy the pairing code from the TokenDesk Mac panel, paste it into the Chrome extension, and click **保存配对**.
+Copy the pairing code from TokenDesk on the Mac, paste it into the Chrome extension, and click **保存配对**.
 
-Normally, pairing survives Chrome and macOS restarts. You only need to pair again if extension storage is cleared, the extension is reinstalled, the Chrome profile changes, or the pairing code is reset.
+Pairing normally survives Chrome and macOS restarts. You need to pair again only if extension storage is cleared, the extension is reinstalled, the Chrome profile changes, or the pairing code is reset.
 
 ## Privacy
 
-TokenDesk is designed so that the macOS app receives only normalized quota information such as percentages, reset metadata, source type, and sync time.
+The Mac app receives only normalized quota information such as percentages, reset metadata, source type, and sync time.
 
-The macOS app does not receive your ChatGPT password, cookies, chat text, or browser authorization token. Authentication stays inside Chrome.
+The Mac app does **not** receive your ChatGPT password, cookies, chat text, or browser authorization token. Authentication stays inside Chrome.
+
+The extension has host access to ChatGPT so it can query the usage endpoint using the browser's existing login session. Review the source before installing if this matters for your security model.
 
 ## Repository layout
 
 ```text
-src/                macOS Swift source
-chrome-extension/   Chrome Manifest V3 extension
-scripts/             macOS install/update helpers
-tests/               parser/bridge/background tests
-assets/              app icons
-docs/                Chinese documentation and changelogs
-dist/                packaged macOS build bundle
+TokenDeskApp.swift                 macOS SwiftUI/AppKit UI
+BrowserBridge.swift                loopback Chrome → Mac bridge
+BrowserUsage.swift                 sanitized quota parsing
+QuotaModels.swift                  quota models
+Info.plist                         macOS app metadata
+Chrome_Extension/                  Chrome Manifest V3 extension
+tests/                             parser / bridge / background tests
+安装到Mac.command                  local macOS installer
+修复首次启动.command               local first-launch repair helper
+只更新Chrome扩展.command           extension-only updater
+README_中文.md                     Chinese documentation
+先读我_网页同步安装指南.md          Chinese install guide
+版本修复说明_*.txt                 version notes
 ```
 
 ## Requirements
@@ -90,11 +112,12 @@ dist/                packaged macOS build bundle
 - macOS 13 or later
 - Google Chrome
 - an active ChatGPT login in Chrome
+- Apple Command Line Tools / Swift compiler for the local build
 
-No Node.js, npm, Codex CLI, or OpenAI API key is required for the current quota-monitoring workflow.
+No OpenAI API key is required for the quota-monitoring workflow.
 
 ## Notes
 
-ChatGPT usage limits and internal web APIs can change. If the upstream usage endpoint or response format changes, TokenDesk may need an update.
+ChatGPT usage limits and internal web APIs can change. If the upstream endpoint or response format changes, TokenDesk may need an update.
 
-Chinese documentation: `docs/README_zh-CN.md`
+Chinese documentation: [README_中文.md](README_%E4%B8%AD%E6%96%87.md)
