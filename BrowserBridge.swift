@@ -30,6 +30,7 @@ final class BrowserBridge {
     func start() {
         do {
             let parameters = NWParameters.tcp
+            // Bind IPv4 loopback ONLY; do not listen to the LAN or the internet.
             parameters.requiredLocalEndpoint = .hostPort(
                 host: NWEndpoint.Host("127.0.0.1"),
                 port: NWEndpoint.Port(rawValue: Self.port)!)
@@ -80,10 +81,13 @@ final class BrowserBridge {
             }
             let lines = headerText.components(separatedBy: "\r\n")
             let requestLine = lines.first ?? ""
+            // Browsers may preflight requests with a custom X-TokenDesk-Key
+            // header. v1.3.1 incorrectly answered 404 to OPTIONS requests.
             if requestLine == "OPTIONS /ingest HTTP/1.1" || requestLine == "OPTIONS /health HTTP/1.1" {
                 self.respond(connection, code: 204, message: "No Content", body: "")
                 return
             }
+            // A harmless, read-only probe for Chrome extension diagnostics.
             if requestLine == "GET /health HTTP/1.1" {
                 self.respond(connection, code: 200, message: "OK",
                              body: "{\"ok\":true,\"app\":\"TokenDesk\"}")
