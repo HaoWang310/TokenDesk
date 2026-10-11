@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TokenDesk 网页额度同步",
-  "version": "1.6.7",
+  "version": "1.6.8",
   "description": "Chrome 后台直接查询 ChatGPT 用量额度并同步到本机 TokenDesk；无需打开用量页面。",
   "permissions": [
     "storage",
