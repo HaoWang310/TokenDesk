@@ -20,7 +20,7 @@ Current data path:
 
 After the first pairing, Chrome can stay in the background. You do **not** need to keep ChatGPT or the Usage page open.
 
-## Current version: v1.6.8
+## Current version: v1.7.0
 
 - Chrome background polling, about every 30 seconds
 - no Codex CLI, Node.js, or npm dependency
@@ -29,6 +29,7 @@ After the first pairing, Chrome can stay in the background. You do **not** need 
 - no Admin Usage API key
 - local 7-day quota history
 - adaptive history chart: expands early data instead of compressing it into a fixed 24-hour axis
+- running-task monitor across open ChatGPT Chrome tabs; completed/stopped tasks disappear automatically
 - chart sample dots plus start-time / “now” labels
 - stale-data detection when Chrome stops syncing
 - local macOS build/install flow
