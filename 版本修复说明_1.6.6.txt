@@ -1,0 +1,12 @@
+TokenDesk v1.6.7
+
+本版针对 macOS 15.7 的首次启动 / Gatekeeper 链路修复：
+1. App 在 ~/Applications 内本机生成 staging bundle。
+2. 对生成 App 使用 xattr -cr 清理全部下载扩展属性，而不只 quarantine。
+3. 在最终安装路径再次 ad-hoc 签名并进行 codesign --deep --strict 验证。
+4. 首次启动不再使用 open / LaunchServices，而是直接启动本机生成的可执行文件。
+5. 附带“修复首次启动.command”作为恢复工具。
+6. 保留 v1.6.5 的 SwiftUI 拆分编译修复、Chrome 后台主动查询和额度历史。
+
+说明：没有 Apple Developer ID / notarization 的情况下，无法把这个 ZIP 变成真正的“已公证发行版”。
+Apple 的无提示外部分发流程需要 Developer ID 签名 + notarization。本版采用的是用户本机编译与本机运行方式。
