@@ -50,6 +50,7 @@ function parseUsageJSON(root) {
     pick(group, 'secondary_window', 'secondaryWindow', 'secondary')
   ];
 
+  // Some server variants expose windows as arrays or nested fields.
   for (const key of ['windows', 'rate_limit_windows', 'rateLimitWindows']) {
     const v = pick(group, key);
     if (Array.isArray(v)) candidates.push(...v);
@@ -192,6 +193,8 @@ let lastBackgroundAttempt = 0;
 async function fetchQuotaFromChatGPT() {
   let lastStatus = 0;
 
+  // Fast path: Chrome host permission + credentials may be enough to send the
+  // existing ChatGPT login session without needing any page to be open.
   for (const url of USAGE_URLS) {
     try {
       const result = await fetchJSON(url);
@@ -204,6 +207,9 @@ async function fetchQuotaFromChatGPT() {
     } catch {}
   }
 
+  // Some ChatGPT builds protect the usage endpoint with the same short-lived
+  // bearer token used by the web app. Obtain it from ChatGPT's own session
+  // endpoint, keep it only in this service-worker invocation, then discard it.
   const session = await readAccessTokenFromSession();
   if (session.ok && session.token) {
     for (const url of USAGE_URLS) {
@@ -258,6 +264,7 @@ async function backgroundQuotaRefresh(reason='alarm') {
 }
 
 async function refreshChatGPTTabs() {
+  // Fallback only. v1.6.2 does not require a ChatGPT tab to exist.
   try {
     const tabs = await chrome.tabs.query({url:['https://chatgpt.com/*','https://chat.openai.com/*']});
     for (const tab of tabs) {
@@ -301,9 +308,11 @@ chrome.alarms.onAlarm.addListener(async alarm=>{
   if (!result.ok) await refreshChatGPTTabs();
 });
 
+// Ensure an unpacked extension reloaded during development also has an alarm.
 installAlarm();
 backgroundQuotaRefresh('service-worker-load').catch(()=>{});
 
+// Test hooks used only by the bundled Node test; harmless in Chrome.
 if (globalThis.__TOKEN_DESK_TEST__) {
   globalThis.__TOKEN_DESK_TEST_PARSE__ = parseUsageJSON;
 }
