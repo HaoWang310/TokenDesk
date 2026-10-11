@@ -1,0 +1,7 @@
+TokenDesk v1.6.7 · 图标收尾版
+
+1. 修复安装日志中的 Invalid Iconset：不再在用户 Mac 上用 iconutil 临时生成图标，改为随安装包提供已经生成好的 TokenDesk.icns。
+2. App 图标继续使用 TokenDesk 现有品牌图形，但 Finder / Applications / LaunchServices 读取更稳定。
+3. 菜单栏图标改为专用的 7 点 TokenDesk 模板图标，自动适配浅色 / 深色菜单栏。
+4. 保留 v1.6.6 已验证成功的安装流程、Chrome 后台主动查询、额度历史和断线状态逻辑。
+5. 不恢复 Codex CLI、Usage API 或 Token 统计旧模块。
