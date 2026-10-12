@@ -1,8 +1,0 @@
-TokenDesk v1.7.4 · Monterey / Intel Swift 编译修复版
-
-1. 最低支持 macOS 12 Monterey。
-2. 支持 Intel x86_64 本机编译，编译目标为当前架构 + macOS 12.0。
-3. 修复 BrowserBridge.swift 中 onTasks / onUsage 闭包捕获在部分 Swift 编译器上要求显式 self 的编译错误。
-4. 同步修复 onState 捕获，并使用更保守的 Swift 可选绑定写法，提高旧工具链兼容性。
-5. 去除 macOS 13 专属的 SwiftUI scrollIndicators API。
-6. 额度监控、自适应历史、思考 / 工作任务分类、动态心跳和自动任务清理保持不变。
