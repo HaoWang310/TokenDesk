@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import Combine
 
-// TokenDesk v1.7.1 monitors quota plus currently running ChatGPT web tasks.
+// TokenDesk v1.7.2 monitors quota plus currently running ChatGPT web tasks.
 // Data path: Chrome extension -> loopback BrowserBridge -> quota history + live task state.
 // There is no Codex CLI process launch, ~/.codex log scan, token accounting,
 // Admin Usage API key, or background Codex polling in this build.
@@ -149,6 +149,15 @@ private final class TokenModel: ObservableObject {
     }
 
     var runningTaskCount: Int { runningTasks.count }
+    var thinkingTaskCount: Int { runningTasks.filter { $0.phase == .thinking }.count }
+    var workingTaskCount: Int { runningTasks.filter { $0.phase == .working }.count }
+
+    var runningTaskSummary: String {
+        var parts: [String] = []
+        if thinkingTaskCount > 0 { parts.append("思考 \(thinkingTaskCount)") }
+        if workingTaskCount > 0 { parts.append("工作 \(workingTaskCount)") }
+        return parts.isEmpty ? "任务 0" : parts.joined(separator: " · ")
+    }
 
     func receivedTaskSnapshot(_ value: RunningTaskSnapshot) {
         taskSnapshotAt = value.observedAt
@@ -609,7 +618,7 @@ private struct RunningTasksSection: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.white.opacity(0.78))
                 Spacer()
-                Text(tasks.isEmpty ? "0" : "\(tasks.count) 运行中")
+                Text(taskSummary)
                     .font(.system(size: 10.5, weight: .semibold, design: .rounded))
                     .foregroundColor(tasks.isEmpty ? .white.opacity(0.38) : Color(red: 0.42, green: 0.88, blue: 0.75))
             }
@@ -635,6 +644,15 @@ private struct RunningTasksSection: View {
         }
     }
 
+    private var taskSummary: String {
+        let thinking = tasks.filter { $0.phase == .thinking }.count
+        let working = tasks.filter { $0.phase == .working }.count
+        var parts: [String] = []
+        if thinking > 0 { parts.append("思考 \(thinking)") }
+        if working > 0 { parts.append("工作 \(working)") }
+        return parts.isEmpty ? "0" : parts.joined(separator: " · ")
+    }
+
     private func taskRow(_ task: RunningChatTask) -> some View {
         Button {
             if let url = URL(string: task.pageURL) { NSWorkspace.shared.open(url) }
@@ -642,13 +660,21 @@ private struct RunningTasksSection: View {
             HStack(spacing: 10) {
                 ProgressView()
                     .controlSize(.small)
-                    .tint(Color(red: 0.42, green: 0.88, blue: 0.75))
+                    .tint(task.phase == .thinking ? Color(red: 0.54, green: 0.69, blue: 1.00) : Color(red: 0.42, green: 0.88, blue: 0.75))
                     .frame(width: 16)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(task.title)
-                        .font(.system(size: 10.8, weight: .medium))
-                        .foregroundColor(.white.opacity(0.86))
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(task.title)
+                            .font(.system(size: 10.8, weight: .medium))
+                            .foregroundColor(.white.opacity(0.86))
+                            .lineLimit(1)
+                        Text(task.phase == .thinking ? "思考" : "工作")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(task.phase == .thinking ? Color(red: 0.64, green: 0.77, blue: 1.00) : Color(red: 0.50, green: 0.94, blue: 0.80))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.white.opacity(0.055), in: Capsule())
+                    }
                     Text("已运行 " + elapsed(task.startedAt))
                         .font(.system(size: 9.5, design: .monospaced))
                         .foregroundColor(.white.opacity(0.38))
@@ -757,7 +783,7 @@ private struct TokenDeskSettingsView: View {
                 .font(.system(size: 11))
                 .foregroundColor(.white.opacity(0.58))
                 .fixedSize(horizontal: false, vertical: true)
-            Text("v1.7.1 新增运行任务监控：跨 Chrome 中已打开的 ChatGPT 标签页汇总正在生成 / 思考 / 执行的任务，任务完成或停止后自动从列表移除。")
+            Text("v1.7.2 将运行任务进一步区分为“思考”和“工作”：页面显示正在思考时显示“思考”，执行、生成、研究或工作阶段显示“工作”。")
                 .font(.system(size: 10.5))
                 .foregroundColor(.white.opacity(0.43))
                 .fixedSize(horizontal: false, vertical: true)
@@ -1008,7 +1034,7 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
         let stale = model.activeQuotaIsStale
         let statusPrefix = stale ? "⚠ " : (model.browserIsFresh ? "🌐 " : "")
         status.button?.attributedTitle = NSAttributedString(
-            string: "\(statusPrefix)5h \(f) · 周 \(w) · 任务 \(model.runningTaskCount)",
+            string: "\(statusPrefix)5h \(f) · 周 \(w) · \(model.runningTaskSummary)",
             attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold),
                          .foregroundColor: stale || critical ? NSColor.systemOrange : NSColor.labelColor]
         )
@@ -1020,7 +1046,7 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
         fiveHourItem.title = line("5 小时剩余", quota?.fiveHour)
         weeklyItem.title = line("每周剩余", quota?.weekly)
         resetsItem.title = quota?.availableResets.map { "可用重置：\($0) 次" } ?? "可用重置：—"
-        taskCountItem.title = "运行任务：\(model.runningTaskCount)"
+        taskCountItem.title = "运行任务：\(model.runningTaskSummary)"
         quotaStateItem.title = model.activeQuotaSource
         status.button?.toolTip = "ChatGPT 剩余额度（非 Token） · " + model.activeQuotaSource
     }
