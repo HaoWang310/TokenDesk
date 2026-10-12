@@ -21,14 +21,14 @@ vm.runInNewContext(code,{chrome,fetch,AbortController,Date,setTimeout,clearTimeo
 function sendTask(active){
   let response=null;
   const ret=receiver({type:'TOKEN_DESK_TASK_STATE',payload:{
-    id:'c:test',active,title:'Long analysis',pageURL:'https://chatgpt.com/c/test',
+    id:'c:test',active,phase:'thinking',title:'Long analysis',pageURL:'https://chatgpt.com/c/test',
     startedAt:Math.floor(Date.now()/1000)-10,lastSeenAt:Math.floor(Date.now()/1000)
   }},{url:'https://chatgpt.com/c/test',tab:{id:7}},r=>response=r);
   assert.strictEqual(ret,false); assert(response && response.ok);
 }
 (async()=>{
   sendTask(true); await new Promise(r=>setTimeout(r,250));
-  assert(lastTaskBody); assert.strictEqual(lastTaskBody.tasks.length,1); assert.strictEqual(lastTaskBody.tasks[0].title,'Long analysis');
+  assert(lastTaskBody); assert.strictEqual(lastTaskBody.tasks.length,1); assert.strictEqual(lastTaskBody.tasks[0].title,'Long analysis'); assert.strictEqual(lastTaskBody.tasks[0].phase,'thinking');
   sendTask(false); await new Promise(r=>setTimeout(r,250));
   assert.strictEqual(lastTaskBody.tasks.length,0);
   console.log('PASS task background aggregation');
