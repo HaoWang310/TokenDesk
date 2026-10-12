@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import Combine
 
-// TokenDesk v1.7.2 monitors quota plus currently running ChatGPT web tasks.
+// TokenDesk v1.7.4 monitors quota plus currently running ChatGPT web tasks.
 // Data path: Chrome extension -> loopback BrowserBridge -> quota history + live task state.
 // There is no Codex CLI process launch, ~/.codex log scan, token accounting,
 // Admin Usage API key, or background Codex polling in this build.
@@ -783,7 +783,7 @@ private struct TokenDeskSettingsView: View {
                 .font(.system(size: 11))
                 .foregroundColor(.white.opacity(0.58))
                 .fixedSize(horizontal: false, vertical: true)
-            Text("v1.7.2 将运行任务进一步区分为“思考”和“工作”：页面显示正在思考时显示“思考”，执行、生成、研究或工作阶段显示“工作”。")
+            Text("v1.7.4 保留“思考 / 工作”任务分类，并增加 macOS 12 Monterey 与 Intel x86_64 编译兼容修复。")
                 .font(.system(size: 10.5))
                 .foregroundColor(.white.opacity(0.43))
                 .fixedSize(horizontal: false, vertical: true)
@@ -808,7 +808,6 @@ private struct TokenDeskScrollContent: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 8)
         }
-        .scrollIndicators(.hidden)
     }
 
     private var quotaAndHistory: some View {
