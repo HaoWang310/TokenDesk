@@ -1,4 +1,4 @@
-# TokenDesk Mac v1.7.4 Monterey / Intel 编译修复版
+# TokenDesk Mac v1.7.5 macOS 通用兼容版
 
 TokenDesk 是 macOS 菜单栏 ChatGPT Work / Codex 剩余额度监控器。
 
@@ -6,7 +6,13 @@ TokenDesk 是 macOS 菜单栏 ChatGPT Work / Codex 剩余额度监控器。
 
 **Chrome 后台主动查询 → 本机 TokenDesk → 菜单栏 / 浮窗 / 额度历史**
 
-## v1.7.4 更新
+## v1.7.5 更新
+
+- 同一套安装包支持 Intel x86_64 与 Apple Silicon arm64；
+- 最低支持 macOS 12 Monterey，兼容 macOS 13 及更新版本；
+- 安装时自动识别当前架构并本机编译；
+- 要求 Swift 5.5+，旧 Command Line Tools 会给出明确提示；
+- 移除 Swift 5.7 简写可选绑定，提升 Monterey / Intel 兼容性；
 
 - 最低支持 macOS 12 Monterey；
 - 支持 Intel x86_64 本机编译；
@@ -47,7 +53,7 @@ TokenDesk 是 macOS 菜单栏 ChatGPT Work / Codex 剩余额度监控器。
 1. 解压 ZIP。
 2. 推荐在终端直接运行 `bash "/完整路径/安装到Mac.command"`。不要先单独输入 `bash` 再直接执行 `.command` 文件。
 3. Chrome 打开 `chrome://extensions`。
-4. 找到 **TokenDesk 网页额度同步** → **重新加载**，确认版本为 `1.7.4`。
+4. 找到 **TokenDesk 网页额度同步** → **重新加载**，确认版本为 `1.7.5`。
 5. 原配对码通常继续有效；若显示未配对，从 Mac TokenDesk 设置中重新复制并保存即可。
 6. 点一次扩展里的 **立即后台查询** 验证。
 
