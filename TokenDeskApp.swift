@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import Combine
 
-// TokenDesk v1.7.4 monitors quota plus currently running ChatGPT web tasks.
+// TokenDesk v1.7.5 monitors quota plus currently running ChatGPT web tasks.
 // Data path: Chrome extension -> loopback BrowserBridge -> quota history + live task state.
 // There is no Codex CLI process launch, ~/.codex log scan, token accounting,
 // Admin Usage API key, or background Codex polling in this build.
@@ -174,7 +174,7 @@ private final class TokenModel: ObservableObject {
     var activeQuotaIsStale: Bool { browserUsage != nil && !browserIsFresh }
 
     var activeQuotaSource: String {
-        guard let browserUsage else { return "未读取到额度（请检查 Chrome 扩展连接）" }
+        guard let browserUsage = browserUsage else { return "未读取到额度（请检查 Chrome 扩展连接）" }
         let time = browserUsage.observedAt.formatted(date: .omitted, time: .standard)
         if browserIsFresh {
             return "🌐 \(browserUsage.sourceLabel) · \(time)"
@@ -436,7 +436,7 @@ private struct QuotaHistorySection: View {
     }
 
     private func percentText(_ value: Int?) -> String {
-        guard let value else { return "—" }
+        guard let value = value else { return "—" }
         return "\(value)%"
     }
 
@@ -783,7 +783,7 @@ private struct TokenDeskSettingsView: View {
                 .font(.system(size: 11))
                 .foregroundColor(.white.opacity(0.58))
                 .fixedSize(horizontal: false, vertical: true)
-            Text("v1.7.4 保留“思考 / 工作”任务分类，并增加 macOS 12 Monterey 与 Intel x86_64 编译兼容修复。")
+            Text("v1.7.5 通用安装版：同一套源码安装包适配 Intel x86_64 与 Apple Silicon arm64，最低 macOS 12，并兼容 Swift 5.5+ 工具链。")
                 .font(.system(size: 10.5))
                 .foregroundColor(.white.opacity(0.43))
                 .fixedSize(horizontal: false, vertical: true)
@@ -1038,7 +1038,7 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
                          .foregroundColor: stale || critical ? NSColor.systemOrange : NSColor.labelColor]
         )
         func line(_ prefix: String, _ window: QuotaWindow?) -> String {
-            guard let window else { return "\(prefix)：—" }
+            guard let window = window else { return "\(prefix)：—" }
             let time = window.resetsAt.map { " · 重置：" + $0.formatted(date: .abbreviated, time: .shortened) } ?? ""
             return "\(prefix)：\(window.remainingPercent)%\(time)"
         }
@@ -1051,7 +1051,7 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
     }
 
     @objc private func windowDidMove(_ notification: Notification) {
-        guard let panel else { return }
+        guard let panel = panel else { return }
         UserDefaults.standard.set(Double(panel.frame.origin.x), forKey: "windowX")
         UserDefaults.standard.set(Double(panel.frame.origin.y), forKey: "windowY")
     }
