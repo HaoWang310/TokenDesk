@@ -8,11 +8,14 @@ TokenDesk 是 macOS 菜单栏 ChatGPT Work / Codex 剩余额度监控器。
 
 ## v1.7.2 更新
 
-- 修复安装时的 `Invalid Iconset`：安装包直接携带有效的 `TokenDesk.icns`，不再在用户 Mac 上临时调用 `iconutil` 生成图标。
-- Finder / `~/Applications` 中使用稳定的 TokenDesk App 图标。
-- 菜单栏改为专用 7 点 TokenDesk 模板图标，自动适配 macOS 浅色 / 深色菜单栏。
-- 保留 v1.6.6 已验证成功的本机编译、签名、首次启动和 Chrome 后台主动查询流程。
-- 不恢复 Codex CLI、Usage API 或 Token 统计旧模块。
+- 运行任务区分为 **思考** 与 **工作** 两种状态；
+- 页面显示“正在思考 / Thinking”时显示“思考”；
+- 页面显示“正在工作 / Working / Running / Researching / Generating / Processing / 执行中”等状态时显示“工作”；
+- 多任务会汇总为例如“思考 2 · 工作 1”；
+- 任务完成、停止、关闭标签页或失联后自动移除；
+- 任务心跳按状态动态刷新：运行时更频繁、空闲时降低刷新频率；
+- 任务同步缓冲上限提高，避免大量并行任务或较长 URL 时同步失败；
+- 额度监控、自适应历史图表、配对和本机 7 天历史逻辑保持不变。
 
 ## 保留功能
 
