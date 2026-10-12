@@ -1,5 +1,5 @@
 #!/bin/bash
-# Token Desk 1.7.2 -- native macOS installer
+# Token Desk 1.7.4 -- native macOS installer
 # Builds locally, installs into ~/Applications, clears quarantine/provenance,
 # ad-hoc signs in the final location, then launches the executable directly.
 set -Eeuo pipefail
@@ -32,7 +32,7 @@ cleanup() {
 trap cleanup EXIT
 
 printf '\n╔═══════════════════════════════════════════════╗\n'
-printf '║          TOKEN DESK · macOS 安装器 v1.7.2      ║\n'
+printf '║          TOKEN DESK · macOS 安装器 v1.7.4      ║\n'
 printf '╚═══════════════════════════════════════════════╝\n\n'
 SYSTEM_VERSION="$(sw_vers -productVersion)"
 printf '系统：%s  架构：%s\n' "$SYSTEM_VERSION" "$(uname -m)"
@@ -40,8 +40,8 @@ printf '安装源目录：%s\n' "$SOURCE_DIR"
 printf '安装日志：%s\n\n' "$LOG"
 
 SYSTEM_MAJOR="${SYSTEM_VERSION%%.*}"
-if [[ "$SYSTEM_MAJOR" =~ ^[0-9]+$ ]] && (( SYSTEM_MAJOR < 13 )); then
-  echo '此版本最低需要 macOS 13 Ventura。'
+if [[ "$SYSTEM_MAJOR" =~ ^[0-9]+$ ]] && (( SYSTEM_MAJOR < 12 )); then
+  echo '此版本最低需要 macOS 12 Monterey。'
   exit 6
 fi
 
@@ -68,7 +68,7 @@ printf '[1/5] 创建本机 App…\n'
 
 printf '[2/5] 编译 Token Desk…\n'
 /usr/bin/xcrun swiftc -swift-version 5 -Onone -parse-as-library \
-  -target "$(uname -m)-apple-macosx13.0" \
+  -target "$(uname -m)-apple-macosx12.0" \
   "$SOURCE_DIR/QuotaModels.swift" \
   "$SOURCE_DIR/BrowserUsage.swift" \
   "$SOURCE_DIR/BrowserBridge.swift" \
