@@ -4,6 +4,8 @@
   globalThis.__TOKEN_DESK_TASK_MONITOR__ = true;
 
   const clean = s => (s || '').replace(/[\u00a0\u200b]/g, ' ').replace(/\s+/g, ' ').trim();
+  const thinkingStatus = /^(?:thinking|正在思考)(?:[.…!！]*)$/i;
+  const workingStatus = /^(?:working|running|researching|searching|coding|generating|processing|正在(?:工作|运行|研究|搜索|编码|生成|处理)|执行中|处理中)(?:[.…!！]*)$/i;
   const exactStatus = /^(?:working|running|thinking|researching|searching|coding|generating|processing|正在(?:工作|运行|思考|研究|搜索|编码|生成|处理)|执行中|处理中)(?:[.…!！]*)$/i;
   const actionText = /^(?:stop(?:\s+(?:generating|responding|response|task|work|thinking|research))?|cancel\s+(?:task|work)|停止(?:生成|回答|响应|任务|工作|思考|研究)?|取消(?:任务|工作))$/i;
   const stopSelectors = [
@@ -41,29 +43,38 @@
     return false;
   }
 
-  function hasActiveStatus() {
-    for (const el of document.querySelectorAll('[data-state="running"],[data-status="running"],[data-testid*="running"],[data-testid*="working"]')) {
-      if (visible(el)) return true;
-    }
+  function phaseFromText(text) {
+    const value = clean(text);
+    if (thinkingStatus.test(value)) return 'thinking';
+    if (workingStatus.test(value)) return 'working';
+    return null;
+  }
+
+  function activePhase() {
+    // Prefer explicit visible status text so “正在思考” is distinguished from “正在工作”.
     for (const el of document.querySelectorAll('[role="status"],[aria-live="polite"],[aria-live="assertive"]')) {
       if (!visible(el)) continue;
-      const text = clean(el.textContent);
-      if (text.length > 0 && text.length <= 80 && exactStatus.test(text)) return true;
+      const phase = phaseFromText(el.textContent);
+      if (phase) return phase;
     }
 
-    // ChatGPT Work can render “正在思考 / Working / Thinking” as an ordinary
-    // div/span instead of a role=status or aria-live node. Scan only compact,
-    // visible UI elements and require an exact short status match to avoid
-    // mistaking normal conversation text for an active task.
     for (const el of document.querySelectorAll('button,span,p,div')) {
       if (!visible(el)) continue;
       if (el.closest('textarea,[contenteditable="true"],[data-message-author-role="user"]')) continue;
       if (el.children.length > 3) continue;
       const text = clean(el.textContent);
       if (text.length === 0 || text.length > 40) continue;
-      if (exactStatus.test(text)) return true;
+      const phase = phaseFromText(text);
+      if (phase) return phase;
     }
-    return false;
+
+    // Structural running markers and Stop controls prove the task is active but
+    // do not tell us that it is specifically thinking, so classify them as work.
+    for (const el of document.querySelectorAll('[data-state="running"],[data-status="running"],[data-testid*="running"],[data-testid*="working"]')) {
+      if (visible(el)) return 'working';
+    }
+    if (hasActiveControl()) return 'working';
+    return null;
   }
 
   function conversationID() {
@@ -82,17 +93,20 @@
   }
 
   let active = false;
+  let phase = null;
   let startedAt = null;
   let lastSent = 0;
   let pending = false;
 
   function sendState(force = false) {
     const now = Date.now();
-    const next = hasActiveControl() || hasActiveStatus();
+    const nextPhase = activePhase();
+    const next = nextPhase !== null;
     if (next && !active) startedAt = now;
     if (!next) startedAt = null;
-    const changed = next !== active;
+    const changed = next !== active || nextPhase !== phase;
     active = next;
+    phase = nextPhase;
     if (!force && !changed && (!active || now - lastSent < 5000)) return;
     lastSent = now;
     chrome.runtime.sendMessage({
@@ -100,6 +114,7 @@
       payload: {
         id: conversationID(),
         active,
+        phase: phase || 'working',
         title: safeTitle(),
         pageURL: location.href.slice(0, 500),
         startedAt: Math.floor((startedAt || now) / 1000),
@@ -132,7 +147,7 @@
     active = false;
     chrome.runtime.sendMessage({
       type:'TOKEN_DESK_TASK_STATE',
-      payload:{id:conversationID(),active:false,title:safeTitle(),pageURL:location.href.slice(0,500),startedAt:0,lastSeenAt:Math.floor(Date.now()/1000)}
+      payload:{id:conversationID(),active:false,phase:phase || 'working',title:safeTitle(),pageURL:location.href.slice(0,500),startedAt:0,lastSeenAt:Math.floor(Date.now()/1000)}
     }).catch(()=>{});
   });
 
@@ -142,6 +157,7 @@
 
   if (globalThis.__TOKEN_DESK_TASK_TEST__) {
     globalThis.__TOKEN_DESK_TASK_TEST_STATUS__ = text => exactStatus.test(clean(text));
+    globalThis.__TOKEN_DESK_TASK_TEST_PHASE__ = text => phaseFromText(text);
     globalThis.__TOKEN_DESK_TASK_TEST_ACTION__ = text => actionText.test(clean(text));
   }
 })();
