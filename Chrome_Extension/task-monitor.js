@@ -50,6 +50,19 @@
       const text = clean(el.textContent);
       if (text.length > 0 && text.length <= 80 && exactStatus.test(text)) return true;
     }
+
+    // ChatGPT Work can render “正在思考 / Working / Thinking” as an ordinary
+    // div/span instead of a role=status or aria-live node. Scan only compact,
+    // visible UI elements and require an exact short status match to avoid
+    // mistaking normal conversation text for an active task.
+    for (const el of document.querySelectorAll('button,span,p,div')) {
+      if (!visible(el)) continue;
+      if (el.closest('textarea,[contenteditable="true"]')) continue;
+      if (el.children.length > 3) continue;
+      const text = clean(el.textContent);
+      if (text.length === 0 || text.length > 40) continue;
+      if (exactStatus.test(text)) return true;
+    }
     return false;
   }
 
