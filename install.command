@@ -1,5 +1,5 @@
 #!/bin/bash
-# Token Desk 1.7.4 -- native macOS installer
+# Token Desk 1.7.5 -- native macOS installer
 # Builds locally, installs into ~/Applications, clears quarantine/provenance,
 # ad-hoc signs in the final location, then launches the executable directly.
 set -Eeuo pipefail
@@ -32,10 +32,19 @@ cleanup() {
 trap cleanup EXIT
 
 printf '\n╔═══════════════════════════════════════════════╗\n'
-printf '║          TOKEN DESK · macOS 安装器 v1.7.4      ║\n'
+printf '║          TOKEN DESK · macOS 安装器 v1.7.5      ║\n'
 printf '╚═══════════════════════════════════════════════╝\n\n'
 SYSTEM_VERSION="$(sw_vers -productVersion)"
-printf '系统：%s  架构：%s\n' "$SYSTEM_VERSION" "$(uname -m)"
+MACHINE_ARCH="$(uname -m)"
+case "$MACHINE_ARCH" in
+  x86_64|arm64) TARGET_ARCH="$MACHINE_ARCH" ;;
+  *)
+    echo "暂不支持此 Mac 架构：$MACHINE_ARCH（仅支持 Intel x86_64 / Apple Silicon arm64）。"
+    exit 8
+    ;;
+esac
+DEPLOYMENT_TARGET="12.0"
+printf '系统：%s  架构：%s  编译目标：%s-apple-macosx%s\n' "$SYSTEM_VERSION" "$MACHINE_ARCH" "$TARGET_ARCH" "$DEPLOYMENT_TARGET"
 printf '安装源目录：%s\n' "$SOURCE_DIR"
 printf '安装日志：%s\n\n' "$LOG"
 
@@ -57,6 +66,19 @@ if ! /usr/bin/xcrun --find swiftc >/dev/null 2>&1; then
   /usr/bin/xcode-select --install || true
   exit 3
 fi
+SWIFTC="$(/usr/bin/xcrun --find swiftc)"
+SWIFT_LINE="$($SWIFTC --version 2>/dev/null | /usr/bin/head -n 1 || true)"
+SWIFT_VERSION="$(printf '%s\n' "$SWIFT_LINE" | /usr/bin/sed -nE 's/.*Swift version ([0-9]+)\.([0-9]+).*/\1.\2/p')"
+if [[ -n "$SWIFT_VERSION" ]]; then
+  SWIFT_MAJOR="${SWIFT_VERSION%%.*}"
+  SWIFT_MINOR="${SWIFT_VERSION#*.}"
+  if (( SWIFT_MAJOR < 5 || (SWIFT_MAJOR == 5 && SWIFT_MINOR < 5) )); then
+    echo "Swift 编译器过旧：$SWIFT_LINE"
+    echo 'TokenDesk v1.7.5 需要 Swift 5.5 或更新版本，请更新 Xcode Command Line Tools。'
+    exit 9
+  fi
+fi
+printf 'Swift：%s\n\n' "${SWIFT_LINE:-未知版本}"
 
 mkdir -p "$TARGET_DIR"
 rm -rf -- "$STAGE_APP"
@@ -67,8 +89,9 @@ printf '[1/5] 创建本机 App…\n'
 /usr/bin/plutil -lint "$STAGE_APP/Contents/Info.plist"
 
 printf '[2/5] 编译 Token Desk…\n'
-/usr/bin/xcrun swiftc -swift-version 5 -Onone -parse-as-library \
-  -target "$(uname -m)-apple-macosx12.0" \
+export MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET"
+"$SWIFTC" -swift-version 5 -Onone -parse-as-library \
+  -target "$TARGET_ARCH-apple-macosx$DEPLOYMENT_TARGET" \
   "$SOURCE_DIR/QuotaModels.swift" \
   "$SOURCE_DIR/BrowserUsage.swift" \
   "$SOURCE_DIR/BrowserBridge.swift" \
