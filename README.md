@@ -20,7 +20,9 @@ Current data path:
 
 After the first pairing, Chrome can stay in the background. You do **not** need to keep ChatGPT or the Usage page open.
 
-## Current version: v1.7.2
+## Current version: v1.7.4
+
+v1.7.4 adds macOS 12 Monterey / Intel x86_64 local-build compatibility and fixes Swift closure-capture compilation on older toolchains.
 
 - Chrome background polling, about every 30 seconds
 - no Codex CLI, Node.js, or npm dependency
