@@ -153,7 +153,15 @@
 
   if (document.documentElement) start();
   else addEventListener('DOMContentLoaded', start, {once:true});
-  setInterval(() => sendState(false), active ? 5000 : 15000);
+
+  // Dynamic heartbeat: active tasks report more often, idle tabs less often.
+  function scheduleHeartbeat() {
+    setTimeout(() => {
+      sendState(false);
+      scheduleHeartbeat();
+    }, active ? 5000 : 15000);
+  }
+  scheduleHeartbeat();
 
   if (globalThis.__TOKEN_DESK_TASK_TEST__) {
     globalThis.__TOKEN_DESK_TASK_TEST_STATUS__ = text => exactStatus.test(clean(text));
