@@ -117,11 +117,11 @@ final class BrowserBridge {
     }
 
     private func receive(_ connection: NWConnection, buffer: Data) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { [weak self] data, _, isComplete, error in
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 32_768) { [weak self] data, _, isComplete, error in
             guard let self else { connection.cancel(); return }
             var collected = buffer
             if let data { collected.append(data) }
-            if collected.count > 16_384 {
+            if collected.count > 65_536 {
                 self.respond(connection, code: 413, message: "Too Large")
                 return
             }
@@ -167,7 +167,7 @@ final class BrowserBridge {
             }
             let contentLength = lengths[0].split(separator: ":", maxSplits: 1).last.map(String.init)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            guard let length = Int(contentLength), (1...16_384).contains(length) else {
+            guard let length = Int(contentLength), (1...65_536).contains(length) else {
                 self.respond(connection, code: 400, message: "Invalid length"); return
             }
             let start = range.upperBound
