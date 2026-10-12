@@ -121,9 +121,9 @@ final class BrowserBridge {
 
     private func receive(_ connection: NWConnection, buffer: Data) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 32_768) { [weak self] data, _, isComplete, error in
-            guard let self else { connection.cancel(); return }
+            guard let self = self else { connection.cancel(); return }
             var collected = buffer
-            if let data { collected.append(data) }
+            if let data = data { collected.append(data) }
             if collected.count > 65_536 {
                 self.respond(connection, code: 413, message: "Too Large")
                 return
