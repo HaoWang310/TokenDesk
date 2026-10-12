@@ -158,6 +158,7 @@ function sanitizeTaskMessage(message, sender) {
     tabId: sender.tab.id,
     id: p.id,
     active: p.active,
+    phase: p.phase === 'thinking' ? 'thinking' : 'working',
     title: typeof p.title === 'string' ? p.title.replace(/\s+/g,' ').trim().slice(0,100) : 'ChatGPT 任务',
     pageURL: (p.pageURL || sender.url).slice(0,500),
     startedAt: Math.min(now, Math.max(now - 7 * 24 * 60 * 60 * 1000, started)),
@@ -183,7 +184,8 @@ async function sendTasksSnapshot() {
   const payload = {
     observedAt: Math.floor(Date.now()/1000),
     tasks: tasks.map(t=>({
-      id:t.id,title:t.title || 'ChatGPT 任务',pageURL:t.pageURL,
+      id:t.id,phase:t.phase === 'thinking' ? 'thinking' : 'working',
+      title:t.title || 'ChatGPT 任务',pageURL:t.pageURL,
       startedAt:Math.floor(t.startedAt/1000),lastSeenAt:Math.floor(t.lastSeenAt/1000)
     }))
   };
