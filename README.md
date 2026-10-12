@@ -20,7 +20,7 @@ Current data path:
 
 After the first pairing, Chrome can stay in the background. You do **not** need to keep ChatGPT or the Usage page open.
 
-## Current version: v1.7.0
+## Current version: v1.7.1
 
 - Chrome background polling, about every 30 seconds
 - no Codex CLI, Node.js, or npm dependency
