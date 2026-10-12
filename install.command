@@ -44,6 +44,9 @@ case "$MACHINE_ARCH" in
     ;;
 esac
 DEPLOYMENT_TARGET="12.0"
+if [[ "$MACHINE_ARCH" == "x86_64" ]] && [[ "$(/usr/sbin/sysctl -in sysctl.proc_translated 2>/dev/null || echo 0)" == "1" ]]; then
+  echo '⚠️ 检测到 Apple Silicon 上的 Rosetta 终端：本次会构建 x86_64 版本，仍可运行；若要 arm64 原生版本，请关闭 Terminal 的“使用 Rosetta 打开”后重新安装。'
+fi
 printf '系统：%s  架构：%s  编译目标：%s-apple-macosx%s\n' "$SYSTEM_VERSION" "$MACHINE_ARCH" "$TARGET_ARCH" "$DEPLOYMENT_TARGET"
 printf '安装源目录：%s\n' "$SOURCE_DIR"
 printf '安装日志：%s\n\n' "$LOG"
