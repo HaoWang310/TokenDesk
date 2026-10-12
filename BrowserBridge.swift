@@ -2,7 +2,13 @@ import Foundation
 import Network
 
 struct RunningChatTask: Equatable, Identifiable {
+    enum Phase: String {
+        case thinking
+        case working
+    }
+
     let id: String
+    let phase: Phase
     let title: String
     let pageURL: String
     let startedAt: Date
@@ -33,7 +39,10 @@ struct RunningTaskSnapshot {
                 Date(timeIntervalSince1970: value > 10_000_000_000 ? value / 1000 : value)
             }
             let title = titleRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+            let phaseRaw = (raw["phase"] as? String)?.lowercased() ?? "working"
+            let phase: RunningChatTask.Phase = phaseRaw == "thinking" ? .thinking : .working
             tasks.append(RunningChatTask(id: id,
+                                         phase: phase,
                                          title: title.isEmpty ? "ChatGPT 任务" : title,
                                          pageURL: pageURL,
                                          startedAt: date(startedRaw),
