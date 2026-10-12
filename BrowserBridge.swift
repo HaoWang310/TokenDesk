@@ -108,7 +108,10 @@ final class BrowserBridge {
     }
 
     private func notify(_ status: String) {
-        DispatchQueue.main.async { [onState] in onState(status) }
+        let handler = self.onState
+        DispatchQueue.main.async {
+            handler(status)
+        }
     }
 
     private func accept(_ connection: NWConnection) {
@@ -184,12 +187,18 @@ final class BrowserBridge {
                 guard let snapshot = RunningTaskSnapshot.parse(obj) else {
                     self.respond(connection, code: 422, message: "Invalid tasks"); return
                 }
-                DispatchQueue.main.async { [onTasks] in onTasks(snapshot) }
+                let taskHandler = self.onTasks
+                DispatchQueue.main.async {
+                    taskHandler(snapshot)
+                }
             } else {
                 guard let usage = BrowserUsage.parse(obj) else {
                     self.respond(connection, code: 422, message: "Invalid usage"); return
                 }
-                DispatchQueue.main.async { [onUsage] in onUsage(usage) }
+                let usageHandler = self.onUsage
+                DispatchQueue.main.async {
+                    usageHandler(usage)
+                }
             }
             self.respond(connection, code: 200, message: "OK")
         }
