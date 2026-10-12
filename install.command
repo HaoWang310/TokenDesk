@@ -1,5 +1,5 @@
 #!/bin/bash
-# Token Desk 1.7.0 -- native macOS installer
+# Token Desk 1.7.1 -- native macOS installer
 # Builds locally, installs into ~/Applications, clears quarantine/provenance,
 # ad-hoc signs in the final location, then launches the executable directly.
 set -Eeuo pipefail
@@ -32,7 +32,7 @@ cleanup() {
 trap cleanup EXIT
 
 printf '\n╔═══════════════════════════════════════════════╗\n'
-printf '║          TOKEN DESK · macOS 安装器 v1.7.0      ║\n'
+printf '║          TOKEN DESK · macOS 安装器 v1.7.1      ║\n'
 printf '╚═══════════════════════════════════════════════╝\n\n'
 SYSTEM_VERSION="$(sw_vers -productVersion)"
 printf '系统：%s  架构：%s\n' "$SYSTEM_VERSION" "$(uname -m)"
