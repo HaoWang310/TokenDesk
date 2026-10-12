@@ -1,5 +1,5 @@
 #!/bin/bash
-# TokenDesk Chrome extension-only patch 1.7.0
+# TokenDesk Chrome extension-only patch 1.7.1
 set -Eeuo pipefail
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "只适用于 macOS。"; exit 1
@@ -19,7 +19,7 @@ cp -R "$SRC/." "$STAGE/"
 rm -rf -- "$DST"
 mv "$STAGE" "$DST"
 echo ''
-echo '✅ 网页扩展 v1.7.0 文件已更新。注意：运行任务面板属于 Mac 主程序功能；若要使用新面板，请运行“安装到Mac.command”。'
+echo '✅ 网页扩展 v1.7.1 文件已更新。注意：运行任务面板属于 Mac 主程序功能；若要使用新面板，请运行“安装到Mac.command”。'
 echo '【必须操作】Chrome 打开 chrome://extensions，找到 TokenDesk 网页额度同步，点「重新加载」。'
 echo 'Chrome 保持运行并登录 ChatGPT 即可；无需打开 ChatGPT 或“设置 → 用量”页面。'
 echo '扩展会约每 30 秒后台主动查询额度，并同步运行中的 ChatGPT 网页任务到 TokenDesk。'
