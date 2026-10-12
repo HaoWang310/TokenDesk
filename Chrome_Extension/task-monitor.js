@@ -57,7 +57,7 @@
     // mistaking normal conversation text for an active task.
     for (const el of document.querySelectorAll('button,span,p,div')) {
       if (!visible(el)) continue;
-      if (el.closest('textarea,[contenteditable="true"]')) continue;
+      if (el.closest('textarea,[contenteditable="true"],[data-message-author-role="user"]')) continue;
       if (el.children.length > 3) continue;
       const text = clean(el.textContent);
       if (text.length === 0 || text.length > 40) continue;
