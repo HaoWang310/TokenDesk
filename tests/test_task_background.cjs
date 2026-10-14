@@ -51,7 +51,7 @@ function sendTask(active){
   assert.strictEqual(lastTaskBody.usageDays.find(d=>d.day===day).activeSeconds,10);
   // Foreground use and background Thinking/Working describe wall-clock
   // intervals. Two tabs reporting the same interval must count ONCE.
-  const endAt = Date.now()-1000, startAt=endAt-10000;
+  const endAt = Date.now()-15000, startAt=endAt-10000;
   const sendInterval=(tabId,start,end,reason)=>{
     let answer=null;
     const returned=receiver({type:'TOKEN_DESK_SESSION_INTERVAL',payload:{
@@ -65,7 +65,7 @@ function sendTask(active){
   const afterOverlap=lastTaskBody.usageDays.find(d=>d.day===day).activeSeconds;
   assert(afterOverlap>=19 && afterOverlap<=21,
     'overlapping foreground and task time must only add one 10s interval');
-  sendInterval(7,startAt-10000,startAt,'task');
+  sendInterval(7,endAt,endAt+10000,'task');
   await new Promise(r=>setTimeout(r,300));
   const afterAdjacent=lastTaskBody.usageDays.find(d=>d.day===day).activeSeconds;
   assert(afterAdjacent>=29 && afterAdjacent<=31,
