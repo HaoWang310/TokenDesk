@@ -272,6 +272,36 @@ const unverifiedTasks = new Map();
 // Retain the last known task for up to two hours after its page disappears.
 // This is a *pending verification* entry, NEVER a claim of live cloud work.
 const UNVERIFIED_RETENTION_MS = 2 * 60 * 60 * 1000;
+const UNVERIFIED_STORAGE_KEY = 'tokenDeskUnverifiedTasks_v1';
+let unverifiedHydrated = false;
+let unverifiedWriteQueue = Promise.resolve();
+
+async function hydrateUnverifiedTasks() {
+  if (unverifiedHydrated) return;
+  const stored = await chrome.storage.local.get({[UNVERIFIED_STORAGE_KEY]:[]});
+  const now = Date.now();
+  const saved = stored[UNVERIFIED_STORAGE_KEY];
+  for (const task of Array.isArray(saved) ? saved.slice(0, 32) : []) {
+    if (!task || typeof task.id !== 'string' || !task.id ||
+        typeof task.pageURL !== 'string' || !validChatGPTURL(task.pageURL) ||
+        task.phase !== 'unverified' || !Number.isFinite(task.verificationExpiresAt) ||
+        task.verificationExpiresAt <= now) continue;
+    if (!unverifiedTasks.has(task.id)) unverifiedTasks.set(task.id, task);
+  }
+  unverifiedHydrated = true;
+}
+
+function saveUnverifiedTasks() {
+  unverifiedWriteQueue = unverifiedWriteQueue
+    .then(async () => {
+      await hydrateUnverifiedTasks();
+      await chrome.storage.local.set({
+        [UNVERIFIED_STORAGE_KEY]: [...unverifiedTasks.values()]
+          .filter(task => task.verificationExpiresAt > Date.now()).slice(0, 32)
+      });
+    }).catch(()=>{});
+}
+
 
 function detachTask(tabId) {
   const task = taskStates.get(tabId);
@@ -281,6 +311,7 @@ function detachTask(tabId) {
     ...task, phase:'unverified', lastSeenAt:Date.now(),
     verificationExpiresAt:Date.now()+UNVERIFIED_RETENTION_MS
   });
+  saveUnverifiedTasks();
   return true;
 }
 
@@ -331,6 +362,7 @@ function currentTasks() {
   for (const [id, task] of unverifiedTasks) {
     if (now > task.verificationExpiresAt) {
       unverifiedTasks.delete(id);
+      saveUnverifiedTasks();
       continue;
     }
     if (!dedup.has(id)) dedup.set(id, task);
@@ -339,6 +371,7 @@ function currentTasks() {
 }
 
 async function sendTasksSnapshot() {
+  await hydrateUnverifiedTasks();
   const {pairingCode} = await chrome.storage.local.get({pairingCode:''});
   if (!/^[0-9a-f]{64}$/i.test(pairingCode)) return {ok:false,message:'任务监控等待配对。'};
   const tasks = currentTasks();
@@ -598,12 +631,12 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
     if (!task) return false;
     if (task.active) {
       taskStates.set(task.tabId, task);
-      unverifiedTasks.delete(task.id);
+      if (unverifiedTasks.delete(task.id)) saveUnverifiedTasks();
     } else if (task.unverified) {
       detachTask(task.tabId);
     } else {
       taskStates.delete(task.tabId);
-      unverifiedTasks.delete(task.id);
+      if (unverifiedTasks.delete(task.id)) saveUnverifiedTasks();
     }
     queueActiveUsage(task.usageDay, task.usageSeconds)
       .finally(() => scheduleTaskPublish());
