@@ -923,8 +923,8 @@ private struct WeeklyUsageSection: View {
             }
 
             HStack(spacing: 9) {
-                metric(title: "今天使用时间", value: durationText(today?.activeSeconds ?? 0))
-                metric(title: "本周累计", value: durationText(totalSeconds))
+                metric(title: "今天前台使用时间", value: durationText(today?.activeSeconds ?? 0))
+                metric(title: "本周前台累计", value: durationText(totalSeconds))
             }
 
             barCard(title: "每日使用时间",
@@ -934,10 +934,10 @@ private struct WeeklyUsageSection: View {
 
             barCard(title: "每日用量",
                     values: calendarWeekDays.map { Double($0.weeklyQuotaUsed) },
-                    labels: days.map { dayLabel($0.day) },
+                    labels: calendarWeekDays.map { dayLabel($0.day) },
                     valueText: { "\(Int($0))%" })
 
-            Text("“使用时间”= ChatGPT 标签页位于前台且最近 5 分钟内有交互的时间；多个标签页不会重复累计。“每日用量”= 每周剩余额度当日下降的百分点，不是 Token 数。本周用量累计：\(totalQuota) 个百分点。统计从每周一 00:00 开始，旧周记录不计入本周；不影响 ChatGPT 官方额度刷新。")
+            Text("“使用时间”= Chrome 的 ChatGPT 标签页可见、拥有焦点且最近 5 分钟内有交互的时间，每约 10 秒同步一次，显示精确到秒。打开 TokenDesk 或其他窗口后会暂停累计；模型在后台运行的时间单独在任务列表显示。“每日用量”= 每周剩余额度当日下降的百分点，不是 Token 数。本周用量累计：\(totalQuota) 个百分点。统计从每周一 00:00 开始，旧周记录不计入本周；不影响 ChatGPT 官方额度刷新。")
                 .font(.system(size: 9.2))
                 .foregroundColor(.white.opacity(0.38))
                 .fixedSize(horizontal: false, vertical: true)
@@ -1006,11 +1006,10 @@ private struct WeeklyUsageSection: View {
     }
 
     private func durationText(_ seconds: Int) -> String {
-        if seconds <= 0 { return "0分" }
-        if seconds < 60 { return "不足1分" }
-        let minutes = seconds / 60
-        if minutes < 60 { return "\(minutes)分" }
-        return "\(minutes / 60)时\(minutes % 60)分"
+        if seconds <= 0 { return "0秒" }
+        if seconds < 60 { return "\(seconds)秒" }
+        if seconds < 3600 { return "\(seconds / 60)分\(seconds % 60)秒" }
+        return "\(seconds / 3600)时\((seconds % 3600) / 60)分\(seconds % 60)秒"
     }
 
     private func dayLabel(_ value: String) -> String {
