@@ -57,6 +57,46 @@ document.getElementById('scan').addEventListener('click',()=>{
   });
 });
 
+// Check model-picker recognition in the actual browser tabs. Diagnostic
+// responses include only whitelisted model/mode labels and selector counts;
+// they never include conversation text, page titles, URLs or credentials.
+document.getElementById('model-check').addEventListener('click', () => {
+  const panel = document.getElementById('model-diagnostic');
+  panel.textContent = '正在检查 ChatGPT 网页的模型选择器…';
+  chrome.runtime.sendMessage({type:'TOKEN_DESK_DIAGNOSE_MODELS'}, result => {
+    if (chrome.runtime.lastError || !result?.ok) {
+      panel.textContent = '无法连接扩展后台；请在 chrome://extensions 中重新加载 TokenDesk 扩展。';
+      return;
+    }
+    const lines = ['扩展版本：' + result.version + ' · ChatGPT 网页：' + result.tabCount + ' 个'];
+    if (!result.tabCount) {
+      lines.push('没有已打开的 ChatGPT 网页；请先打开 chatgpt.com 并刷新页面。');
+    }
+    for (const item of result.reports || []) {
+      const label = '标签页 ' + item.tab + '：';
+      if (item.status === 'content-script-missing') {
+        lines.push(label + '未收到网页监听脚本，请刷新该 ChatGPT 网页。');
+      } else if (item.status === 'recognized') {
+        lines.push(label + (item.model || item.lastModel || '已检测到模型按钮') +
+          '（监听脚本 ' + item.scriptVersion + '）');
+      } else if (item.status === 'picker-absent') {
+        lines.push(label + '页面没有可见的模型选择按钮（常见于 Work 页面）');
+      } else if (item.status === 'picker-not-visible') {
+        lines.push(label + '存在模型按钮，但当前被隐藏');
+      } else {
+        lines.push(label + '找到 ' + item.visiblePickerCount + ' 个模型按钮，但按钮未提供可识别的名称');
+      }
+      if (item.status !== 'recognized' && item.status !== 'content-script-missing') {
+        lines.push('  网页监听脚本：' + item.scriptVersion +
+          ' · 回复模型属性节点：' + item.taggedAssistantMessages);
+      }
+    }
+    lines.push('如果仍显示未识别，请把此诊断结果截图发来；诊断不包含聊天正文。');
+    panel.textContent = lines.join('\\n');
+    panel.style.whiteSpace = 'pre-line';
+  });
+});
+
 chrome.storage.onChanged.addListener((changes,area)=>{
   if(area==='local' && (changes.lastSnapshot || changes.backgroundStatus || changes.syncStatus)) renderLast();
 });
