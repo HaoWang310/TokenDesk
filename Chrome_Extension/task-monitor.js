@@ -126,15 +126,16 @@
         el.getAttribute('title') || el.textContent
       ))
       .filter(Boolean).slice(0, 3);
-    const model = currentModelLabel();
+    const model = resolvedModel || currentModelLabel();
     const taggedAssistantMessages = document.querySelectorAll(
       '[data-message-author-role="assistant"][data-message-model-slug]'
     ).length;
     return {
-      ok: true, scriptVersion: '1.8.4',
+      ok: true, scriptVersion: '1.8.6',
       activeTask: active,
       model: model || '',
       lastModel: lastModel || '',
+      modelSource: resolvedModel ? 'resolved_model_slug' : 'page-selector',
       pickerCount: pillNodes.length,
       visiblePickerCount: visiblePills.length,
       recognizedPills,
@@ -298,13 +299,32 @@
   let lastSent = 0;
   let pending = false;
   let lastModel = null;
+  let resolvedModel = null;
+  let modelRoute = location.pathname;
+  window.addEventListener('message', event => {
+    if (event.source !== window || event.origin !== location.origin) return;
+    const detail = event.data;
+    if (detail?.channel !== 'TOKEN_DESK_NETWORK_V1' || detail.type !== 'MODEL') return;
+    const candidate = detail.model;
+    if (detail.source !== 'resolved_model_slug' || typeof candidate !== 'string' ||
+        candidate.length > 64 ||
+        !/^(?:gpt-[a-z0-9][a-z0-9._-]*|o[1-9][a-z0-9._-]*)$/i.test(candidate)) return;
+    resolvedModel = candidate;
+    modelRoute = location.pathname;
+    sendState(true);
+  });
 
   function sendState(force = false) {
     const now = Date.now();
     const nextPhase = activePhase();
     const next = nextPhase !== null;
     // Keep the last confirmed UI label while a transient picker redraws.
-    const model = currentModelLabel() || lastModel;
+    if (location.pathname !== modelRoute) {
+      resolvedModel = null;
+      lastModel = null;
+      modelRoute = location.pathname;
+    }
+    const model = resolvedModel || currentModelLabel() || lastModel;
     const usageSeconds = 0; // Activity is sent by flushActiveUsage, not task updates.
     if (next && !active) startedAt = now;
     if (!next) startedAt = null;
@@ -385,7 +405,7 @@
         usageDay:localDayKey(new Date(now)),
         usageSeconds
       }
-    }).catch(()=>{});
+    });
   });
 
   if (document.documentElement) start();
