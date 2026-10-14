@@ -181,7 +181,6 @@
   const usageIdleMs = 5 * 60 * 1000;
   let lastInteractionAt = Date.now();
   let usageTickAt = Date.now();
-  let usageCarryMs = 0;
 
   function localDayKey(date = new Date()) {
     const y = date.getFullYear();
@@ -194,28 +193,26 @@
     lastInteractionAt = Date.now();
   }
 
-  function takeActiveUsageSeconds(now) {
-    const elapsed = Math.max(0, Math.min(20_000, now - usageTickAt));
+  // One clock interval counts as ChatGPT use if the user is actively
+  // interacting with the page OR there is confirmed live model work.
+  // Both conditions may overlap; the background merges time intervals
+  // across all tabs so that they never double-count the same wall-clock time.
+  function usageInterval(now = Date.now()) {
+    const startAt = Math.max(usageTickAt, now - 60_000);
     usageTickAt = now;
-    const engaged = document.visibilityState === 'visible' &&
-      document.hasFocus() &&
-      now - lastInteractionAt <= usageIdleMs;
-    if (engaged) usageCarryMs += elapsed;
-    const seconds = Math.floor(usageCarryMs / 1000);
-    usageCarryMs -= seconds * 1000;
-    return seconds;
+    const foreground = document.visibilityState === 'visible' &&
+      document.hasFocus() && now - lastInteractionAt <= usageIdleMs;
+    const confirmedWork = active && activePhase() !== null;
+    if (now <= startAt || (!foreground && !confirmedWork)) return null;
+    return {startAt, endAt:now, reason:foreground ? 'foreground' : 'task'};
   }
 
-  // Send focused, recently interactive use time on its own heartbeat.
-  // This must not depend on whether the UI currently exposes a running task.
-  // The background worker persists the seconds before updating Windows/macOS.
   function flushActiveUsage() {
-    const now = Date.now();
-    const seconds = takeActiveUsageSeconds(now);
-    if (seconds <= 0) return;
+    const interval = usageInterval();
+    if (!interval) return;
     sendMonitorMessage({
-      type: 'TOKEN_DESK_ACTIVE_USAGE',
-      payload: { usageDay: localDayKey(new Date(now)), usageSeconds: seconds }
+      type:'TOKEN_DESK_SESSION_INTERVAL',
+      payload:interval
     });
   }
 
@@ -394,8 +391,16 @@
     for (const type of ['pointerdown','keydown','wheel','scroll','touchstart']) {
       addEventListener(type, noteInteraction, {passive:true, capture:true});
     }
-    addEventListener('focus', noteInteraction, true);
+    addEventListener('focus', () => {
+      usageTickAt = Date.now();
+      noteInteraction();
+    }, true);
+    addEventListener('blur', flushActiveUsage, true);
     document.addEventListener('visibilitychange', () => {
+      // Flush the last focused interval before visibility changes, then
+      // start a fresh interval so a hidden idle tab cannot earn session time.
+      flushActiveUsage();
+      usageTickAt = Date.now();
       if (document.visibilityState === 'visible') noteInteraction();
       sendState(true);
     });
@@ -460,5 +465,6 @@
     globalThis.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__ = modelDiagnostic;
     globalThis.__TOKEN_DESK_TASK_TEST_ACTIVE_PHASE__ = activePhase;
     globalThis.__TOKEN_DESK_TASK_TEST_SEND__ = sendState;
+    globalThis.__TOKEN_DESK_TASK_TEST_USAGE_INTERVAL__ = usageInterval;
   }
 })();
