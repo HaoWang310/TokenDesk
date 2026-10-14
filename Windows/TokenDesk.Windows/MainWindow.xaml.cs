@@ -112,20 +112,28 @@ public partial class MainWindow : Window
     {
         if (ActiveUsageCanvas.ActualWidth < 20 || QuotaUsageCanvas.ActualWidth < 20) return;
 
-        var days = _store.UsageDays
-            .OrderBy(d => d.Day, StringComparer.Ordinal)
-            .TakeLast(7)
-            .ToList();
+        // The chart shows a fixed local calendar week, Monday to Sunday,
+        // not a rolling last-seven-days window. It clears visually at Monday
+        // 00:00 even when Chrome is closed and no fresh snapshot has arrived.
+        var todayDate = DateTime.Today;
+        var monday = todayDate.AddDays(-(((int)todayDate.DayOfWeek + 6) % 7));
+        var reported = _store.UsageDays;
+        var days = Enumerable.Range(0, 7).Select(index =>
+        {
+            var dateKey = monday.AddDays(index).ToString("yyyy-MM-dd");
+            return reported.LastOrDefault(d => d.Day == dateKey)
+                ?? new DailyUsageState { Day = dateKey };
+        }).ToList();
 
-        var todayKey = DateTime.Now.ToString("yyyy-MM-dd");
-        var today = days.LastOrDefault(d => d.Day == todayKey);
+        var todayKey = todayDate.ToString("yyyy-MM-dd");
+        var today = days.First(d => d.Day == todayKey);
         var totalSeconds = days.Sum(d => d.ActiveSeconds);
         var totalQuota = days.Sum(d => d.WeeklyQuotaUsed);
 
         TodayActiveText.Text = DurationText(today?.ActiveSeconds ?? 0);
         WeekActiveText.Text = DurationText(totalSeconds);
         WeekQuotaTotalText.Text =
-            $"7 天用量累计：{totalQuota}%。使用时间只记录 Chrome/Edge 中前台活跃的 ChatGPT 网页；安装前记录不会补录。若持续为 0，请重新加载浏览器扩展并刷新 ChatGPT 网页；用量不是 Token 数。";
+            $"本周用量累计：{totalQuota} 个百分点 · 统计周期 {monday:MM/dd}–{monday.AddDays(6):MM/dd}（每周一 00:00 清零）。使用时间仅统计 Chrome/Edge 中前台活跃的 ChatGPT 网页；安装前历史不会补录。用量不是 Token 数，也不会改变官方额度重置时间。";
 
         DrawBarChart(ActiveUsageCanvas, days,
             d => d.ActiveSeconds,
