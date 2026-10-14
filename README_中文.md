@@ -6,9 +6,9 @@ TokenDesk 是面向 macOS 与 Windows 的 ChatGPT Work / Codex 剩余额度与�
 
 **Chrome 后台主动查询 → 本机 TokenDesk → 菜单栏 / 浮窗 / 额度历史**
 
-## Windows v1.1.1
+## Windows v1.2.0
 
-Windows v1.1.1 新增同样的四类额度提醒：5h 20%、周 20%、5h 刷新、周刷新。
+Windows v1.2.0 保留四类额度提醒，并新增每日使用时间、一周柱状统计和运行任务模型显示。
 
 Windows 第一版已经加入同一 GitHub 仓库：
 
@@ -24,7 +24,15 @@ Windows 第一版已经加入同一 GitHub 仓库：
 
 Windows 详细说明见 [Windows/README.md](Windows/README.md)。
 
-## macOS v1.7.7 更新
+## macOS v1.8.0 更新
+
+- 统计每天 ChatGPT 主动使用时间；
+- 使用时间定义为：ChatGPT 标签页处于前台，并且最近 5 分钟内有键盘、鼠标、滚动等交互；
+- 多个 ChatGPT 标签页不会重复累计；
+- 新增最近 7 天“每日使用时间”柱状图；
+- 新增最近 7 天“每日用量”柱状图；这里的用量是每周剩余额度当日下降的百分点，不是 Token 数；
+- 正在“思考 / 工作”的任务旁显示当前 ChatGPT 界面所选模型，例如 GPT-5.6；如果页面没有暴露模型名称则显示未识别；
+
 
 - 5 小时额度剩余 20% 或以下时发送系统提醒；
 - 每周额度剩余 20% 或以下时发送系统提醒；
@@ -77,7 +85,7 @@ Windows 详细说明见 [Windows/README.md](Windows/README.md)。
 1. 解压 ZIP。
 2. 推荐在终端直接运行 `bash "/完整路径/安装到Mac.command"`。不要先单独输入 `bash` 再直接执行 `.command` 文件。
 3. Chrome 打开 `chrome://extensions`。
-4. 找到 **TokenDesk 网页额度同步** → **重新加载**，确认版本为 `1.7.6`。
+4. 找到 **TokenDesk 网页额度同步** → **重新加载**，确认版本为 `1.8.0`。
 5. 原配对码通常继续有效；若显示未配对，从 Mac TokenDesk 设置中重新复制并保存即可。
 6. 点一次扩展里的 **立即后台查询** 验证。
 
@@ -85,4 +93,4 @@ Windows 详细说明见 [Windows/README.md](Windows/README.md)。
 
 Chrome 登录凭据、Cookie、密码、聊天正文和 Authorization header 不会发送到 TokenDesk。Mac App 只接收净化后的额度百分比、重置信息、来源类型和同步时间。
 
-- v1.7.7 / Windows v1.1.1：修复空闲 ChatGPT Work 模式标签页被误判为正在“工作”。
+- v1.8.0 / Windows v1.2.0：继续保留空闲 Work 模式误判修复，并新增 7 天使用统计和模型显示。
