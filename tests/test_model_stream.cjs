@@ -16,6 +16,7 @@ vm.runInNewContext(code,context);
 const parse=context.__TOKEN_DESK_TEST_MODEL_FROM_EVENT__;
 assert.equal(parse({resolved_model_slug:'gpt-6-thinking'}),'gpt-6-thinking');
 assert.equal(parse({message:{metadata:{resolved_model_slug:'gpt-6-thinking'}}}),'gpt-6-thinking');
+assert.equal(parse({p:'/metadata/resolved_model_slug',v:'gpt-6-thinking'}),'gpt-6-thinking');
 assert.equal(parse({message:{content:{parts:[{resolved_model_slug:'gpt-9-fake'}]}}}),null);
 assert.equal(parse({resolved_model_slug:'secret-bearer-token'}),null);
 assert.equal(parse({resolved_model_slug:'gpt-6-thinking',content:'should not be included'}),'gpt-6-thinking');
