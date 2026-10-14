@@ -76,21 +76,21 @@ public sealed class AppStore
     private List<QuotaAlertEvent> EvaluateAlertsLocked(QuotaSnapshotState? previous, QuotaSnapshotState current)
     {
         var alerts = new List<QuotaAlertEvent>();
-        EvaluateWindowLocked("5小时", current.FiveHour, 300, ref _state.FiveHourLowAlertCycle, alerts);
-        EvaluateWindowLocked("每周", current.Weekly, 10_080, ref _state.WeeklyLowAlertCycle, alerts);
+        _state.FiveHourLowAlertCycle = EvaluateWindowLocked("5小时", current.FiveHour, 300, _state.FiveHourLowAlertCycle, alerts);
+        _state.WeeklyLowAlertCycle = EvaluateWindowLocked("每周", current.Weekly, 10_080, _state.WeeklyLowAlertCycle, alerts);
 
         AddResetAlertIfAdvanced("5小时", previous?.FiveHour, current.FiveHour, alerts);
         AddResetAlertIfAdvanced("每周", previous?.Weekly, current.Weekly, alerts);
         return alerts;
     }
 
-    private static void EvaluateWindowLocked(string label,
+    private static string EvaluateWindowLocked(string label,
         QuotaWindowState? window,
         int fallbackMinutes,
-        ref string storedCycle,
+        string storedCycle,
         List<QuotaAlertEvent> alerts)
     {
-        if (window == null) return;
+        if (window == null) return storedCycle;
         var cycle = window.ResetsAt?.ToUnixTimeSeconds().ToString() ??
                     "fallback-" + (DateTimeOffset.UtcNow.ToUnixTimeSeconds() / Math.Max(60, fallbackMinutes * 60));
 
@@ -104,8 +104,9 @@ public sealed class AppStore
                 Title = $"TokenDesk · {label}额度剩余20%或以下",
                 Message = $"当前剩余 {window.RemainingPercent}%{reset}。"
             });
-            storedCycle = cycle;
+            return cycle;
         }
+        return storedCycle;
     }
 
     private static void AddResetAlertIfAdvanced(string label,
