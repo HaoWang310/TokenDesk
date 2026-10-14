@@ -1,0 +1,16 @@
+TokenDesk macOS v1.7.6 / Windows v1.1.0 · 额度提醒版
+
+新增四类系统提醒：
+1. 5 小时额度剩余 20% 或以下提醒。
+2. 每周额度剩余 20% 或以下提醒。
+3. 5 小时额度刷新提醒。
+4. 每周额度刷新提醒。
+
+提醒逻辑：
+- 低额度提醒按当前额度周期去重，同一周期只提醒一次。
+- macOS 会根据 ChatGPT 返回的 reset 时间安排本地系统通知。
+- Windows 会在托盘显示系统提醒，并每 15 秒检查已知 reset 时间；Chrome 返回新额度周期时也会确认刷新提醒。
+- 额度监控、历史曲线、思考 / 工作任务统计、本机桥接和隐私模型保持不变。
+
+macOS：v1.7.6，最低 macOS 12 Monterey，Intel x86_64 / Apple Silicon arm64。
+Windows：v1.1.0，Windows 10 2004+ / Windows 11，win-x64 / win-arm64。
