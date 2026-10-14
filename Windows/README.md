@@ -1,4 +1,4 @@
-# TokenDesk for Windows v1.2.11
+# TokenDesk for Windows v1.2.12
 
 Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机桥接协议。
 
@@ -46,6 +46,7 @@ Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机
 
 Windows 端只接收净化后的额度字段与任务元数据（标题、URL、运行阶段、时间）。不会从 Chrome 扩展传输 ChatGPT 对话正文、密码、Cookie 或 bearer token 到 TokenDesk 桌面端。
 
+- v1.2.12 审计并修复总使用时长迁移重复累计：升级到时间区间算法时冻结既有旧统计；旧版网页脚本此后不再重复叠加。修复 ChatGPT 编辑控件重新聚焦造成的计时丢失，并在 Thinking / Working 开始、完成时准确拆分时间区间。Chrome 扩展需要 v1.8.10；保留每周一清零。
 - v1.2.11 将“今天 / 本周使用时间”升级为 ChatGPT 总使用时长：Chrome/Edge 网页前台活跃时间 + 已确认后台 Thinking/Working 的运行时间，时间区间在不同标签页之间去重；周一 00:00 自动清零，继承既有记录。闲置网页、未确认的离线任务、ChatGPT 独立桌面客户端及安装前未记录时长不计入。扩展须更新至 v1.8.9。
 - v1.2.10 修复本周使用时间看似停滞的问题：使用时间原本按整分钟向下取整，现显示秒级精度（1分35秒），每约10秒从扩展同步记录。明确标注仅统计 Chrome/Edge 前台、拥有焦点且近期交互的 ChatGPT 使用时间；切换到 TokenDesk 或其他程序会暂停，不等于模型后台计算时长。无需清空已有统计，扩展继续使用 v1.8.8。
 - v1.2.9 加强模型识别：ChatGPT conversation SSE 支持更长时间的模型元数据监听、JSON patch 形式的 resolved_model_slug、首页转入新对话时保留已解析模型；浏览器扩展诊断展示已看到的 conversation 请求数/SSE 流数和最新解析状态。需要 Chrome/Edge 扩展 v1.8.8，刷新网页后发送新消息验证。该功能依赖 ChatGPT 非公开的网页响应格式。
