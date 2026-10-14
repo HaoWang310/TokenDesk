@@ -476,6 +476,20 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
     backgroundQuotaRefresh('manual').then(sendResponse).catch(e=>sendResponse({ok:false,message:String(e)}));
     return true;
   }
+  // Active-use time is reported independently of the running-task detector:
+  // an ordinary focused ChatGPT conversation should count even when no
+  // Thinking / Working task is active.
+  if(message?.type==='TOKEN_DESK_ACTIVE_USAGE') {
+    if (!Number.isInteger(sender?.tab?.id) || !validChatGPTURL(sender?.url || '')) return false;
+    const p = message.payload || {};
+    const dayKey = typeof p.usageDay === 'string' ? p.usageDay : '';
+    const seconds = p.usageSeconds;
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dayKey) ||
+        !Number.isInteger(seconds) || seconds < 1 || seconds > 30) return false;
+    queueActiveUsage(dayKey, seconds).finally(() => scheduleTaskPublish());
+    sendResponse({ok:true});
+    return false;
+  }
   if(message?.type==='TOKEN_DESK_TASK_STATE') {
     const task = sanitizeTaskMessage(message, sender);
     if (!task) return false;
