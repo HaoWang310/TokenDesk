@@ -30,15 +30,15 @@
     'button[data-testid*="model-switcher"]',
     'header button[aria-haspopup="menu"]'
   ];
-  const explicitModelHint = /(?:\\bGPT[-\\s]?\\d|\\bo[134](?:[-\\s]|$)|\\bCodex\\b)/i;
+  const explicitModelHint = /(?:\bGPT[-\s]?\d|\bo[134](?:[-\s]|$)|\bCodex\b)/i;
   const bareModeHint = /^(?:instant|thinking|pro|auto|medium|high|extra high|very high|extended|pro extended|fast|balanced|standard|极速|快速|均衡|自动|思考|标准|高|中|极高|最新的|最新|深度思考|高级|扩展|最高)$/i;
-  const compactModeHint = /^(?:\\d+(?:\\.\\d+)?)(?:instant|thinking|pro|high|medium|均衡|高|中|极速)$/i;
+  const compactModeHint = /^(?:\d+(?:\.\d+)?)(?:instant|thinking|pro|high|medium|均衡|高|中|极速)$/i;
   const genericModelText = /^(?:ChatGPT|Model|模型|Choose model|Select model|Select ChatGPT model|New chat|新聊天|选择模型|选择 ChatGPT 模型)$/i;
 
   function normalizeModelLabel(value) {
     const label = clean(value)
-      .replace(/^(?:model|模型|模型选择)\\s*[:：-]?\\s*/i, '')
-      .replace(/^(?:ChatGPT)\\s+(?=GPT[-\\s]?\\d)/i, '')
+      .replace(/^(?:model|模型|模型选择)\s*[:：-]?\s*/i, '')
+      .replace(/^(?:ChatGPT)\s+(?=GPT[-\s]?\d)/i, '')
       .replace(/[⌄▾▼]+$/g, '')
       .trim();
     if (!label || label.length > 64 || genericModelText.test(label)) return null;
