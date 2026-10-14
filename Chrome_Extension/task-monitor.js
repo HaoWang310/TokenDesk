@@ -131,11 +131,14 @@
       '[data-message-author-role="assistant"][data-message-model-slug]'
     ).length;
     return {
-      ok: true, scriptVersion: '1.8.6',
+      ok: true, scriptVersion: '1.8.8',
       activeTask: active,
       model: model || '',
       lastModel: lastModel || '',
       modelSource: resolvedModel ? 'resolved_model_slug' : 'page-selector',
+      conversationFetchSeen,
+      streamSeen,
+      lastStreamStatus,
       pickerCount: pillNodes.length,
       visiblePickerCount: visiblePills.length,
       recognizedPills,
@@ -297,16 +300,31 @@
   let lastModel = null;
   let resolvedModel = null;
   let modelRoute = location.pathname;
+  let conversationFetchSeen = 0;
+  let streamSeen = 0;
+  let lastStreamStatus = 'not-observed';
   window.addEventListener('message', event => {
     if (event.source !== window || event.origin !== location.origin) return;
     const detail = event.data;
-    if (detail?.channel !== 'TOKEN_DESK_NETWORK_V1' || detail.type !== 'MODEL') return;
+    if (detail?.channel !== 'TOKEN_DESK_NETWORK_V1') return;
+    if (detail.type === 'MODEL_TRACE') {
+      const status = String(detail.status || '');
+      const allowed = ['conversation-fetch-seen','stream-observed','not-event-stream',
+                       'stream-ended','timeout','byte-limit'];
+      if (!allowed.includes(status)) return;
+      if (status === 'conversation-fetch-seen') conversationFetchSeen++;
+      if (status === 'stream-observed') streamSeen++;
+      lastStreamStatus = status;
+      return;
+    }
+    if (detail.type !== 'MODEL') return;
     const candidate = detail.model;
     if (detail.source !== 'resolved_model_slug' || typeof candidate !== 'string' ||
         candidate.length > 64 ||
         !/^(?:gpt-[a-z0-9][a-z0-9._-]*|o[1-9][a-z0-9._-]*)$/i.test(candidate)) return;
     resolvedModel = candidate;
     modelRoute = location.pathname;
+    lastStreamStatus = 'model-found';
     sendState(true);
   });
 
