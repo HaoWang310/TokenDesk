@@ -181,6 +181,7 @@
   const usageIdleMs = 5 * 60 * 1000;
   let lastInteractionAt = Date.now();
   let usageTickAt = Date.now();
+  let previouslyFocused = document.visibilityState === 'visible' && document.hasFocus();
 
   function localDayKey(date = new Date()) {
     const y = date.getFullYear();
@@ -200,8 +201,12 @@
   function usageInterval(now = Date.now()) {
     const startAt = Math.max(usageTickAt, now - 60_000);
     usageTickAt = now;
-    const foreground = document.visibilityState === 'visible' &&
-      document.hasFocus() && now - lastInteractionAt <= usageIdleMs;
+    const focusedNow = document.visibilityState === 'visible' && document.hasFocus();
+    const foreground = (focusedNow || previouslyFocused) &&
+      now - lastInteractionAt <= usageIdleMs;
+    // Flush focus-loss transitions before clearing the previous interval;
+    // do not count an entire hidden-page interval as foreground usage.
+    previouslyFocused = focusedNow;
     const confirmedWork = active && now - lastSent <= 45_000;
     if (now <= startAt || (!foreground && !confirmedWork)) return null;
     return {startAt, endAt:now, reason:foreground ? 'foreground' : 'task'};
@@ -393,6 +398,7 @@
     }
     addEventListener('focus', () => {
       usageTickAt = Date.now();
+      previouslyFocused = true;
       noteInteraction();
     }, true);
     addEventListener('blur', flushActiveUsage, true);
