@@ -9,14 +9,24 @@ struct RunningChatTask: Equatable, Identifiable {
 
     let id: String
     let phase: Phase
+    let modelName: String?
     let title: String
     let pageURL: String
     let startedAt: Date
     let lastSeenAt: Date
 }
 
+struct DailyUsageStat: Equatable, Identifiable {
+    let day: String
+    let activeSeconds: Int
+    let weeklyQuotaUsed: Int
+
+    var id: String { day }
+}
+
 struct RunningTaskSnapshot {
     let tasks: [RunningChatTask]
+    let usageDays: [DailyUsageStat]
     let observedAt: Date
 
     static func parse(_ obj: [String: Any]) -> RunningTaskSnapshot? {
@@ -41,14 +51,40 @@ struct RunningTaskSnapshot {
             let title = titleRaw.trimmingCharacters(in: .whitespacesAndNewlines)
             let phaseRaw = (raw["phase"] as? String)?.lowercased() ?? "working"
             let phase: RunningChatTask.Phase = phaseRaw == "thinking" ? .thinking : .working
+            let modelRaw = ((raw["model"] as? String) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let modelName = modelRaw.isEmpty ? nil : String(modelRaw.prefix(64))
             tasks.append(RunningChatTask(id: id,
                                          phase: phase,
+                                         modelName: modelName,
                                          title: title.isEmpty ? "ChatGPT 任务" : title,
                                          pageURL: pageURL,
                                          startedAt: date(startedRaw),
                                          lastSeenAt: date(seenRaw)))
         }
-        return RunningTaskSnapshot(tasks: tasks.sorted { $0.startedAt < $1.startedAt }, observedAt: observedAt)
+
+        var usageDays: [DailyUsageStat] = []
+        if let rawDays = obj["usageDays"] as? [[String: Any]], rawDays.count <= 8 {
+            for item in rawDays {
+                guard let day = item["day"] as? String,
+                      day.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil,
+                      let activeNumber = item["activeSeconds"] as? NSNumber,
+                      let quotaNumber = item["weeklyQuotaUsed"] as? NSNumber else { continue }
+                let active = activeNumber.intValue
+                let quota = quotaNumber.intValue
+                guard Double(active) == activeNumber.doubleValue,
+                      Double(quota) == quotaNumber.doubleValue,
+                      (0...86_400).contains(active),
+                      (0...500).contains(quota) else { continue }
+                usageDays.append(DailyUsageStat(day: day,
+                                                activeSeconds: active,
+                                                weeklyQuotaUsed: quota))
+            }
+        }
+        usageDays.sort { $0.day < $1.day }
+        return RunningTaskSnapshot(tasks: tasks.sorted { $0.startedAt < $1.startedAt },
+                                   usageDays: usageDays,
+                                   observedAt: observedAt)
     }
 }
 
