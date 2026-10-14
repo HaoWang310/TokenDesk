@@ -85,19 +85,19 @@
                         </Grid.ColumnDefinitions>
                         <Border Grid.Column="0" Background="#151920" CornerRadius="10" Padding="10">
                             <StackPanel>
-                                <TextBlock Text="今天前台使用时间" Foreground="#7F8898" FontSize="9.5"/>
+                                <TextBlock Text="今天总使用时长" Foreground="#7F8898" FontSize="9.5"/>
                                 <TextBlock x:Name="TodayActiveText" Text="0秒" FontSize="18" FontWeight="SemiBold" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Border>
                         <Border Grid.Column="2" Background="#151920" CornerRadius="10" Padding="10">
                             <StackPanel>
-                                <TextBlock Text="本周前台累计" Foreground="#7F8898" FontSize="9.5"/>
+                                <TextBlock Text="本周总使用时长" Foreground="#7F8898" FontSize="9.5"/>
                                 <TextBlock x:Name="WeekActiveText" Text="0秒" FontSize="18" FontWeight="SemiBold" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Border>
                     </Grid>
 
-                    <TextBlock Text="只记录 ChatGPT 网页前台活跃时间，每约10秒同步；切换到其他程序会暂停，后台任务运行时间另计。"
+                    <TextBlock Text="统计 ChatGPT 网页活跃使用时间 + 已确认的后台 Thinking / Working 运行时间；重叠只计一次。无任务的闲置页面不计时，已关闭网页的待确认任务不计时。"
                                Foreground="#7F8898" FontSize="9.5" TextWrapping="Wrap" Margin="0,0,0,8"/>
                     <TextBlock Text="每日使用时间" Foreground="#AAB2C0" FontSize="10" FontWeight="SemiBold"/>
                     <Canvas x:Name="ActiveUsageCanvas" Height="116" Margin="0,6,0,10" SizeChanged="WeeklyCanvas_SizeChanged"/>
