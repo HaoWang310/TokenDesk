@@ -82,94 +82,106 @@ public sealed class AppStore
     private List<QuotaAlertEvent> EvaluateAlertsLocked(QuotaSnapshotState? previous, QuotaSnapshotState current)
     {
         var alerts = new List<QuotaAlertEvent>();
-        _state.FiveHourLowAlertCycle = EvaluateWindowLocked("5小时", current.FiveHour, 300, _state.FiveHourLowAlertCycle, alerts);
-        _state.WeeklyLowAlertCycle = EvaluateWindowLocked("每周", current.Weekly, 10_080, _state.WeeklyLowAlertCycle, alerts);
 
-        _state.FiveHourResetAlertCycle = AddResetAlertIfAdvanced("5小时", previous?.FiveHour, current.FiveHour, _state.FiveHourResetAlertCycle, alerts);
-        _state.WeeklyResetAlertCycle = AddResetAlertIfAdvanced("每周", previous?.Weekly, current.Weekly, _state.WeeklyResetAlertCycle, alerts);
+        (_state.FiveHourLowAlertCycle, _state.FiveHourResetAlertCycle) =
+            EvaluateWindowLocked(
+                "5小时",
+                previous?.FiveHour,
+                current.FiveHour,
+                300,
+                _state.FiveHourLowAlertCycle,
+                _state.FiveHourResetAlertCycle,
+                current.ObservedAt,
+                alerts);
+
+        (_state.WeeklyLowAlertCycle, _state.WeeklyResetAlertCycle) =
+            EvaluateWindowLocked(
+                "每周",
+                previous?.Weekly,
+                current.Weekly,
+                10_080,
+                _state.WeeklyLowAlertCycle,
+                _state.WeeklyResetAlertCycle,
+                current.ObservedAt,
+                alerts);
+
         return alerts;
     }
 
-    private static string EvaluateWindowLocked(string label,
-        QuotaWindowState? window,
-        int fallbackMinutes,
-        string storedCycle,
+    private static (string LowState, string ResetCycle) EvaluateWindowLocked(
+        string label,
+        QuotaWindowState? previous,
+        QuotaWindowState? current,
+        int durationMinutes,
+        string lowState,
+        string resetCycle,
+        DateTimeOffset observedAt,
         List<QuotaAlertEvent> alerts)
     {
-        if (window == null) return storedCycle;
-        var cycle = window.ResetsAt?.ToUnixTimeSeconds().ToString() ??
-                    "fallback-" + (DateTimeOffset.UtcNow.ToUnixTimeSeconds() / Math.Max(60, fallbackMinutes * 60));
+        if (current == null) return (lowState, resetCycle);
 
-        if (window.RemainingPercent <= 20 && storedCycle != cycle)
+        var cycleChanged = false;
+
+        // ChatGPT normally keeps one reset timestamp throughout a quota cycle.
+        // A real reset moves that timestamp forward by roughly one full window.
+        // Ignore small timestamp corrections so they cannot re-arm alerts.
+        if (previous?.ResetsAt != null && current.ResetsAt != null)
         {
-            var reset = window.ResetsAt == null
+            var forwardShift = current.ResetsAt.Value - previous.ResetsAt.Value;
+            var minimumShift = TimeSpan.FromMinutes(Math.Max(2.0, durationMinutes * 0.5));
+            cycleChanged = forwardShift > minimumShift;
+        }
+
+        // Fallback when resetAt is missing or temporarily stale: a large refill
+        // from depleted quota to a high remaining percentage is strong evidence
+        // that a new cycle has actually started.
+        if (!cycleChanged &&
+            previous != null &&
+            previous.RemainingPercent <= 30 &&
+            current.RemainingPercent >= 70 &&
+            current.RemainingPercent - previous.RemainingPercent >= 40)
+        {
+            cycleChanged = true;
+        }
+
+        if (cycleChanged)
+        {
+            // A confirmed new cycle re-arms the <=20% warning exactly once.
+            lowState = "";
+
+            var cycleToken = current.ResetsAt?.ToUnixTimeSeconds().ToString() ??
+                             "refill-" + observedAt.ToUnixTimeSeconds();
+
+            if (resetCycle != cycleToken)
+            {
+                alerts.Add(new QuotaAlertEvent
+                {
+                    Title = $"TokenDesk · {label}额度已刷新",
+                    Message = $"新的{label}额度周期已经开始，当前剩余 {current.RemainingPercent}%。"
+                });
+                resetCycle = cycleToken;
+            }
+        }
+
+        // Persistent latch: once the <=20% warning has been shown, closing it
+        // does not cause another warning in the same cycle. It is cleared only
+        // by the confirmed cycle-change branch above.
+        if (current.RemainingPercent <= 20 && string.IsNullOrEmpty(lowState))
+        {
+            var resetText = current.ResetsAt == null
                 ? ""
-                : $"，预计 {window.ResetsAt.Value.ToLocalTime():M/d HH:mm} 刷新";
+                : $"，预计 {current.ResetsAt.Value.ToLocalTime():M/d HH:mm} 刷新";
+
             alerts.Add(new QuotaAlertEvent
             {
                 Title = $"TokenDesk · {label}额度剩余20%或以下",
-                Message = $"当前剩余 {window.RemainingPercent}%{reset}。"
+                Message = $"当前剩余 {current.RemainingPercent}%{resetText}。"
             });
-            return cycle;
+
+            lowState = current.ResetsAt?.ToUnixTimeSeconds().ToString() ?? "shown";
         }
-        return storedCycle;
-    }
 
-    private static string AddResetAlertIfAdvanced(string label,
-        QuotaWindowState? previous,
-        QuotaWindowState? current,
-        string notifiedCycle,
-        List<QuotaAlertEvent> alerts)
-    {
-        if (previous?.ResetsAt == null || current?.ResetsAt == null) return notifiedCycle;
-        if (current.ResetsAt <= previous.ResetsAt) return notifiedCycle;
-
-        var completedCycle = previous.ResetsAt.Value.ToUnixTimeSeconds().ToString();
-        if (notifiedCycle == completedCycle) return notifiedCycle;
-
-        // A later reset timestamp means ChatGPT has moved into a new quota cycle.
-        alerts.Add(new QuotaAlertEvent
-        {
-            Title = $"TokenDesk · {label}额度已刷新",
-            Message = $"新的{label}额度周期已经开始，当前剩余 {current.RemainingPercent}%。"
-        });
-        return completedCycle;
-    }
-
-    public IReadOnlyList<QuotaAlertEvent> CheckDueResetAlerts(DateTimeOffset now)
-    {
-        lock (_gate)
-        {
-            var alerts = new List<QuotaAlertEvent>();
-            _state.FiveHourResetAlertCycle = CheckDueResetLocked("5小时", _state.LastQuota?.FiveHour,
-                _state.FiveHourResetAlertCycle, now, alerts);
-            _state.WeeklyResetAlertCycle = CheckDueResetLocked("每周", _state.LastQuota?.Weekly,
-                _state.WeeklyResetAlertCycle, now, alerts);
-            if (alerts.Count > 0) SaveLocked();
-            return alerts;
-        }
-    }
-
-    private static string CheckDueResetLocked(string label,
-        QuotaWindowState? window,
-        string notifiedCycle,
-        DateTimeOffset now,
-        List<QuotaAlertEvent> alerts)
-    {
-        if (window?.ResetsAt == null) return notifiedCycle;
-        var resetAt = window.ResetsAt.Value;
-        var age = now - resetAt;
-        if (age < TimeSpan.Zero || age > TimeSpan.FromMinutes(10)) return notifiedCycle;
-
-        var cycle = resetAt.ToUnixTimeSeconds().ToString();
-        if (notifiedCycle == cycle) return notifiedCycle;
-
-        alerts.Add(new QuotaAlertEvent
-        {
-            Title = $"TokenDesk · {label}额度已刷新",
-            Message = $"新的{label}额度周期已经开始。"
-        });
-        return cycle;
+        return (lowState, resetCycle);
     }
 
     public void SetTaskSnapshot(TaskSnapshotState snapshot)
