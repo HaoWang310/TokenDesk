@@ -8,19 +8,11 @@
   const workingStatus = /^(?:working|running|researching|searching|coding|generating|processing|正在(?:工作|运行|研究|搜索|编码|生成|处理)|执行中|处理中)(?:[.…!！]*)$/i;
   const exactStatus = /^(?:working|running|thinking|researching|searching|coding|generating|processing|正在(?:工作|运行|思考|研究|搜索|编码|生成|处理)|执行中|处理中)(?:[.…!！]*)$/i;
   const actionText = /^(?:stop(?:\s+(?:generating|responding|response|task|work|thinking|research))?|cancel\s+(?:task|work)|停止(?:生成|回答|响应|任务|工作|思考|研究)?|取消(?:任务|工作))$/i;
+  // Only use high-confidence stop controls. Broad "*=stop" selectors caused
+  // idle Work-mode tabs to be classified as active.
   const stopSelectors = [
     'button[data-testid="stop-button"]',
-    'button[data-testid="stop-generating-button"]',
-    'button[data-testid*="stop"][aria-label]',
-    'button[aria-label*="Stop generating" i]',
-    'button[aria-label*="Stop responding" i]',
-    'button[aria-label*="Stop response" i]',
-    'button[aria-label*="Stop task" i]',
-    'button[aria-label*="Stop work" i]',
-    'button[aria-label*="停止生成"]',
-    'button[aria-label*="停止回答"]',
-    'button[aria-label*="停止任务"]',
-    'button[title*="Stop generating" i]'
+    'button[data-testid="stop-generating-button"]'
   ];
 
   function visible(el) {
@@ -28,7 +20,15 @@
     const style = getComputedStyle(el);
     if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
     const rect = el.getBoundingClientRect();
-    return rect.width > 1 && rect.height > 1;
+    if (rect.width <= 1 || rect.height <= 1) return false;
+    // "Visible" must also mean inside the current viewport. Old response text
+    // elsewhere in the scrollback must not count as a live status.
+    const vw = globalThis.innerWidth || document.documentElement?.clientWidth || 0;
+    const vh = globalThis.innerHeight || document.documentElement?.clientHeight || 0;
+    if (vw > 0 && vh > 0) {
+      if (rect.right <= 0 || rect.bottom <= 0 || rect.left >= vw || rect.top >= vh) return false;
+    }
+    return true;
   }
 
   function hasActiveControl() {
@@ -37,6 +37,8 @@
     }
     for (const el of document.querySelectorAll('button,[role="button"]')) {
       if (!visible(el)) continue;
+      if (el.disabled || el.getAttribute('aria-disabled') === 'true') continue;
+      if (el.closest('nav,aside,[role="navigation"],[role="menu"],[data-testid*="sidebar"],[data-testid*="menu"]')) continue;
       const label = clean(el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent);
       if (label.length <= 48 && actionText.test(label)) return true;
     }
@@ -58,9 +60,9 @@
       if (phase) return phase;
     }
 
-    for (const el of document.querySelectorAll('button,span,p,div')) {
+    for (const el of document.querySelectorAll('span,p,div')) {
       if (!visible(el)) continue;
-      if (el.closest('textarea,[contenteditable="true"],[data-message-author-role="user"]')) continue;
+      if (el.closest('textarea,[contenteditable="true"],[data-message-author-role="user"],nav,aside,[role="navigation"],[role="menu"],[data-testid*="sidebar"],[data-testid*="menu"]')) continue;
       if (el.children.length > 3) continue;
       const text = clean(el.textContent);
       if (text.length === 0 || text.length > 40) continue;
@@ -68,11 +70,9 @@
       if (phase) return phase;
     }
 
-    // Structural running markers and Stop controls prove the task is active but
-    // do not tell us that it is specifically thinking, so classify them as work.
-    for (const el of document.querySelectorAll('[data-state="running"],[data-status="running"],[data-testid*="running"],[data-testid*="working"]')) {
-      if (visible(el)) return 'working';
-    }
+    // A real Stop control is still a strong active-task signal, but generic
+    // data-testid/data-state "working/running" markers are intentionally ignored:
+    // ChatGPT can keep those markers on idle Work-mode UI.
     if (hasActiveControl()) return 'working';
     return null;
   }
