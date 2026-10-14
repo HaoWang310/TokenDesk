@@ -55,7 +55,7 @@ function sendTask(active){
   await new Promise(r=>setTimeout(r,100));
   assert(diagnostics && diagnostics.ok);
   assert.strictEqual(diagnostics.tabCount,0);
-  assert.deepStrictEqual(diagnostics.reports,[]);
+  assert(Array.isArray(diagnostics.reports) && diagnostics.reports.length === 0);
   sendTask(false); await new Promise(r=>setTimeout(r,250));
   assert.strictEqual(lastTaskBody.tasks.length,0);
   console.log('PASS task background aggregation');
