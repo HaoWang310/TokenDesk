@@ -8,6 +8,55 @@
   let networkAuthExpired = false;
   let lastSignature = '';
   let lastSubmittedAt = 0;
+  let bridgeContextValid = true;
+
+  function bridgeFailure(error) {
+    const raw = String(error?.message || error || '');
+    const invalidated = /extension context invalidated|context invalidated|extension has been reloaded|extension context has been invalidated/i.test(raw);
+    if (invalidated) {
+      // Existing ChatGPT tabs retain old content scripts after an extension
+      // reload. Stop listening instead of repeatedly sending from that old
+      // invalid context and filling Chrome's Errors list.
+      bridgeContextValid = false;
+      stopDOMFallback();
+      window.removeEventListener?.('message', onNetworkMessage);
+    }
+    return {
+      ok: false,
+      code: invalidated ? 'RELOAD_CHATGPT_TAB' : 'BACKGROUND_NOT_READY',
+      message: invalidated
+        ? '扩展已重新加载，请刷新此 ChatGPT 网页以启用新版监听脚本。'
+        : '浏览器扩展后台未响应；请重新加载扩展并刷新 ChatGPT 网页。'
+    };
+  }
+
+  function sendToBackground(payload, done) {
+    if (!bridgeContextValid) {
+      const result = bridgeFailure('Extension context invalidated');
+      done?.(result);
+      return result;
+    }
+    try {
+      chrome.runtime.sendMessage({ type: 'TOKEN_DESK_WEB_USAGE', payload }, response => {
+        // Always read lastError, even without a reply callback. Chrome reports
+        // an unchecked runtime.lastError if it is ignored.
+        let error = null;
+        try { error = chrome.runtime.lastError; }
+        catch (cause) { error = cause; }
+        if (error) {
+          const failure = bridgeFailure(error);
+          done?.(failure);
+          return;
+        }
+        done?.({ok: !!response?.ok, message: response?.message || '没有收到桌面接收端确认。'});
+      });
+      return {ok:true};
+    } catch (cause) {
+      const result = bridgeFailure(cause);
+      done?.(result);
+      return result;
+    }
+  }
 
   const isFive = s => /^5\s*(?:小时|小時|h(?:ours?)?)(?:\s*(?:用量|额度|額度|usage|limit))?$/i.test(s);
   const isWeek = s => /^(?:1\s*(?:周|週|星期|w(?:eeks?)?)(?:\s*(?:用量|额度|額度|usage|limit))?|weekly(?:\s*(?:usage|limit))?)$/i.test(s);
@@ -35,16 +84,11 @@
     ]);
     if (!done && signature===lastSignature && now-lastSubmittedAt<15_000) return {ok:true,message:'额度未变化'};
     lastSignature=signature; lastSubmittedAt=now;
-    chrome.runtime.sendMessage({type:'TOKEN_DESK_WEB_USAGE',payload},response=>{
-      if (!done) return;
-      if (chrome.runtime.lastError) done({ok:false,message:'浏览器后台未响应，请重新加载扩展。'});
-      else done({ok:!!response?.ok,message:response?.message || '没有收到 Mac 接收端确认。'});
-    });
-    return {ok:true};
+    return sendToBackground(payload, done);
   }
 
   // MAIN-world network hook sends ONLY sanitized quota fields through postMessage.
-  window.addEventListener('message', event => {
+  function onNetworkMessage(event) {
     if (event.source !== window || event.origin !== location.origin) return;
     const m=event.data;
     if (!m || m.channel!==CHANNEL) return;
@@ -58,7 +102,8 @@
       stopDOMFallback();
       submitPayload({...m.payload, source:'network'});
     }
-  });
+  }
+  window.addEventListener('message', onNetworkMessage);
 
   function requestNetworkRefresh() {
     window.postMessage({channel:CHANNEL,type:'REFRESH'}, location.origin);
