@@ -1,12 +1,28 @@
-# TokenDesk Mac v1.7.5 macOS 通用兼容版
+# TokenDesk · macOS + Windows
 
-TokenDesk 是 macOS 菜单栏 ChatGPT Work / Codex 剩余额度监控器。
+TokenDesk 是面向 macOS 与 Windows 的 ChatGPT Work / Codex 剩余额度与运行任务监控器。
 
 主数据链路只有一条：
 
 **Chrome 后台主动查询 → 本机 TokenDesk → 菜单栏 / 浮窗 / 额度历史**
 
-## v1.7.5 更新
+## Windows v1.0.0
+
+Windows 第一版已经加入同一 GitHub 仓库：
+
+- Windows 10 2004（19041）及以上，推荐 Windows 11；
+- 普通 Intel / AMD 电脑使用 `win-x64`；
+- Windows on ARM 使用 `win-arm64`；
+- .NET 8 + WPF 原生桌面程序，发布包为自包含版本，无需另外安装 .NET；
+- 右下角系统托盘常驻；
+- 5 小时 / 每周额度、重置时间和 7 天历史；
+- 运行任务区分「思考 / 工作」；
+- Chrome / Edge 共用同一份 Chromium 扩展；
+- 本地桥接仍只监听 `127.0.0.1:18743`。
+
+Windows 详细说明见 [Windows/README.md](Windows/README.md)。
+
+## macOS v1.7.5 更新
 
 - 同一套安装包支持 Intel x86_64 与 Apple Silicon arm64；
 - 最低支持 macOS 12 Monterey，兼容 macOS 13 及更新版本；
