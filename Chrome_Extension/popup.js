@@ -22,6 +22,13 @@ function renderLast() {
   });
 }
 renderLast();
+const completionCheckbox=document.getElementById('completion-notice');
+chrome.storage.local.get({tokendeskTaskCompletionNoticeEnabledV1:true},config=>{
+  completionCheckbox.checked=config.tokendeskTaskCompletionNoticeEnabledV1!==false;
+});
+completionCheckbox.addEventListener('change',()=>{
+  chrome.storage.local.set({tokendeskTaskCompletionNoticeEnabledV1:completionCheckbox.checked});
+});
 
 function requestHealth() {
   status('正在检测 TokenDesk 桌面端…');
