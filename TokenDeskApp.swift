@@ -170,6 +170,7 @@ private final class TokenModel: ObservableObject {
     @Published var browserBridgeState: String = "等待 Chrome 后台连接"
     @Published var quotaHistory: [QuotaHistoryPoint] = []
     @Published var runningTasks: [RunningChatTask] = []
+    @Published var usageDays: [DailyUsageStat] = []
     @Published private var taskSnapshotAt: Date?
     @Published var panelHeight: CGFloat = 700
     @Published var showSettings = false
@@ -236,6 +237,7 @@ private final class TokenModel: ObservableObject {
     func receivedTaskSnapshot(_ value: RunningTaskSnapshot) {
         taskSnapshotAt = value.observedAt
         runningTasks = value.tasks
+        usageDays = value.usageDays
     }
 
     var browserIsFresh: Bool {
@@ -749,6 +751,15 @@ private struct RunningTasksSection: View {
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.white.opacity(0.055), in: Capsule())
+                        if let modelName = task.modelName {
+                            Text(modelName)
+                                .font(.system(size: 8.5, weight: .medium))
+                                .foregroundColor(Color(red: 0.72, green: 0.78, blue: 1.00))
+                                .lineLimit(1)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.white.opacity(0.045), in: Capsule())
+                        }
                     }
                     Text("已运行 " + elapsed(task.startedAt))
                         .font(.system(size: 9.5, design: .monospaced))
@@ -770,6 +781,122 @@ private struct RunningTasksSection: View {
         if seconds < 60 { return "\(seconds)秒" }
         if seconds < 3600 { return "\(seconds / 60)分\(seconds % 60)秒" }
         return "\(seconds / 3600)时\((seconds % 3600) / 60)分"
+    }
+}
+
+
+private struct WeeklyUsageSection: View {
+    let days: [DailyUsageStat]
+
+    private var today: DailyUsageStat? { days.last }
+    private var totalSeconds: Int { days.reduce(0) { $0 + $1.activeSeconds } }
+    private var totalQuota: Int { days.reduce(0) { $0 + $1.weeklyQuotaUsed } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("近 7 天使用统计")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.78))
+                Spacer()
+                Text("Chrome 本机记录")
+                    .font(.system(size: 9.5))
+                    .foregroundColor(.white.opacity(0.38))
+            }
+
+            HStack(spacing: 9) {
+                metric(title: "今天使用时间", value: durationText(today?.activeSeconds ?? 0))
+                metric(title: "7 天累计", value: durationText(totalSeconds))
+            }
+
+            barCard(title: "每日使用时间",
+                    values: days.map { Double($0.activeSeconds) },
+                    labels: days.map { dayLabel($0.day) },
+                    valueText: { durationText(Int($0)) })
+
+            barCard(title: "每日用量",
+                    values: days.map { Double($0.weeklyQuotaUsed) },
+                    labels: days.map { dayLabel($0.day) },
+                    valueText: { "\(Int($0))%" })
+
+            Text("“使用时间”= ChatGPT 标签页位于前台且最近 5 分钟内有交互的时间；多个标签页不会重复累计。“每日用量”= 每周剩余额度当日下降的百分点，不是 Token 数。7 天用量累计：\(totalQuota)%。")
+                .font(.system(size: 9.2))
+                .foregroundColor(.white.opacity(0.38))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func metric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.system(size: 9.5))
+                .foregroundColor(.white.opacity(0.46))
+            Text(value)
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundColor(.white.opacity(0.9))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func barCard(title: String,
+                         values: [Double],
+                         labels: [String],
+                         valueText: @escaping (Double) -> String) -> some View {
+        let maximum = max(1.0, values.max() ?? 0)
+        return VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundColor(.white.opacity(0.56))
+
+            if values.isEmpty {
+                Text("更新扩展后开始记录")
+                    .font(.system(size: 10))
+                    .foregroundColor(.white.opacity(0.36))
+                    .frame(maxWidth: .infinity, minHeight: 82)
+            } else {
+                HStack(alignment: .bottom, spacing: 5) {
+                    ForEach(Array(values.enumerated()), id: \.offset) { index, value in
+                        VStack(spacing: 4) {
+                            Text(valueText(value))
+                                .font(.system(size: 7.5, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.42))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                            GeometryReader { geo in
+                                VStack(spacing: 0) {
+                                    Spacer(minLength: 0)
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .fill(Color(red: 0.42, green: 0.88, blue: 0.75).opacity(value > 0 ? 0.88 : 0.18))
+                                        .frame(height: max(2, geo.size.height * CGFloat(value / maximum)))
+                                }
+                            }
+                            .frame(height: 62)
+                            Text(index < labels.count ? labels[index] : "")
+                                .font(.system(size: 7.5, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.32))
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+        }
+        .padding(11)
+        .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func durationText(_ seconds: Int) -> String {
+        let minutes = max(0, seconds) / 60
+        if minutes < 60 { return "\(minutes)分" }
+        return "\(minutes / 60)时\(minutes % 60)分"
+    }
+
+    private func dayLabel(_ value: String) -> String {
+        let parts = value.split(separator: "-")
+        guard parts.count == 3 else { return value }
+        return "\(Int(parts[1]) ?? 0)/\(Int(parts[2]) ?? 0)"
     }
 }
 
@@ -892,6 +1019,8 @@ private struct TokenDeskScrollContent: View {
                              isStale: model.activeQuotaIsStale)
                 .padding(.bottom, 15)
             RunningTasksSection(tasks: model.runningTasks)
+                .padding(.bottom, 15)
+            WeeklyUsageSection(days: model.usageDays)
                 .padding(.bottom, 15)
             QuotaHistorySection(points: model.quotaHistory,
                                 points24h: model.quotaHistory24h,
