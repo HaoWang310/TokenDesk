@@ -15,6 +15,77 @@
     'button[data-testid="stop-generating-button"]'
   ];
 
+  const modelSelectors = [
+    'button[data-testid="model-switcher-dropdown-button"]',
+    '[data-testid="model-switcher-dropdown-button"]',
+    'button[data-testid*="model-switcher"]',
+    'header button[aria-haspopup="menu"]'
+  ];
+  const modelHint = /(?:\bGPT[-\s]?\d|\bGPT\b|\bo[134](?:[-\s]|$)|\bCodex\b|\bThinking\b|\bInstant\b|\bPro\b|\bAuto\b)/i;
+  const genericModelText = /^(?:ChatGPT|Model|模型|Choose model|Select model|New chat|新聊天)$/i;
+
+  function normalizeModelLabel(value) {
+    const text = clean(value)
+      .replace(/^(?:model|模型)\s*[:：-]?\s*/i, '')
+      .replace(/[⌄▾▼]+$/g, '')
+      .trim();
+    if (!text || text.length > 64 || genericModelText.test(text)) return null;
+    return modelHint.test(text) ? text : null;
+  }
+
+  function currentModelLabel() {
+    for (const selector of modelSelectors) {
+      for (const el of document.querySelectorAll(selector)) {
+        if (!visible(el)) continue;
+        const candidates = [
+          el.getAttribute('aria-label'),
+          el.getAttribute('title'),
+          el.textContent
+        ];
+        for (const value of candidates) {
+          const label = normalizeModelLabel(value);
+          if (label) return label;
+        }
+      }
+    }
+
+    // Conservative fallback: only inspect buttons in the page header.
+    for (const el of document.querySelectorAll('header button')) {
+      if (!visible(el)) continue;
+      const label = normalizeModelLabel(el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent);
+      if (label) return label;
+    }
+    return null;
+  }
+
+  const usageIdleMs = 5 * 60 * 1000;
+  let lastInteractionAt = Date.now();
+  let usageTickAt = Date.now();
+  let usageCarryMs = 0;
+
+  function localDayKey(date = new Date()) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function noteInteraction() {
+    lastInteractionAt = Date.now();
+  }
+
+  function takeActiveUsageSeconds(now) {
+    const elapsed = Math.max(0, Math.min(20_000, now - usageTickAt));
+    usageTickAt = now;
+    const engaged = document.visibilityState === 'visible' &&
+      document.hasFocus() &&
+      now - lastInteractionAt <= usageIdleMs;
+    if (engaged) usageCarryMs += elapsed;
+    const seconds = Math.floor(usageCarryMs / 1000);
+    usageCarryMs -= seconds * 1000;
+    return seconds;
+  }
+
   function visible(el) {
     if (!el || !el.isConnected) return false;
     const style = getComputedStyle(el);
@@ -97,17 +168,21 @@
   let startedAt = null;
   let lastSent = 0;
   let pending = false;
+  let lastModel = null;
 
   function sendState(force = false) {
     const now = Date.now();
     const nextPhase = activePhase();
     const next = nextPhase !== null;
+    const model = currentModelLabel();
+    const usageSeconds = takeActiveUsageSeconds(now);
     if (next && !active) startedAt = now;
     if (!next) startedAt = null;
-    const changed = next !== active || nextPhase !== phase;
+    const changed = next !== active || nextPhase !== phase || model !== lastModel;
     active = next;
     phase = nextPhase;
-    if (!force && !changed && (!active || now - lastSent < 5000)) return;
+    lastModel = model;
+    if (!force && !changed && usageSeconds === 0 && (!active || now - lastSent < 5000)) return;
     lastSent = now;
     chrome.runtime.sendMessage({
       type: 'TOKEN_DESK_TASK_STATE',
@@ -115,10 +190,13 @@
         id: conversationID(),
         active,
         phase: phase || 'working',
+        model: model || '',
         title: safeTitle(),
         pageURL: location.href.slice(0, 500),
         startedAt: Math.floor((startedAt || now) / 1000),
-        lastSeenAt: Math.floor(now / 1000)
+        lastSeenAt: Math.floor(now / 1000),
+        usageDay: localDayKey(new Date(now)),
+        usageSeconds
       }
     }).catch(() => {});
   }
@@ -132,6 +210,14 @@
   function start() {
     if (!document.documentElement) return;
     observer.observe(document.documentElement, {childList:true,subtree:true,attributes:true,attributeFilter:['aria-label','data-state','data-status','data-testid','disabled']});
+    for (const type of ['pointerdown','keydown','wheel','scroll','touchstart']) {
+      addEventListener(type, noteInteraction, {passive:true, capture:true});
+    }
+    addEventListener('focus', noteInteraction, true);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') noteInteraction();
+      sendState(true);
+    });
     sendState(true);
   }
 
@@ -143,11 +229,24 @@
   });
 
   addEventListener('pagehide', () => {
-    if (!active) return;
+    const now = Date.now();
+    const usageSeconds = takeActiveUsageSeconds(now);
+    const wasActive = active;
     active = false;
     chrome.runtime.sendMessage({
       type:'TOKEN_DESK_TASK_STATE',
-      payload:{id:conversationID(),active:false,phase:phase || 'working',title:safeTitle(),pageURL:location.href.slice(0,500),startedAt:0,lastSeenAt:Math.floor(Date.now()/1000)}
+      payload:{
+        id:conversationID(),
+        active:false,
+        phase:phase || 'working',
+        model:lastModel || currentModelLabel() || '',
+        title:safeTitle(),
+        pageURL:location.href.slice(0,500),
+        startedAt:wasActive ? Math.floor((startedAt || now)/1000) : 0,
+        lastSeenAt:Math.floor(now/1000),
+        usageDay:localDayKey(new Date(now)),
+        usageSeconds
+      }
     }).catch(()=>{});
   });
 
@@ -167,5 +266,6 @@
     globalThis.__TOKEN_DESK_TASK_TEST_STATUS__ = text => exactStatus.test(clean(text));
     globalThis.__TOKEN_DESK_TASK_TEST_PHASE__ = text => phaseFromText(text);
     globalThis.__TOKEN_DESK_TASK_TEST_ACTION__ = text => actionText.test(clean(text));
+    globalThis.__TOKEN_DESK_TASK_TEST_MODEL__ = text => normalizeModelLabel(text);
   }
 })();
