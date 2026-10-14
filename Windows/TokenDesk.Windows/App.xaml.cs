@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Windows;
+using System.Windows.Threading;
 using Forms = System.Windows.Forms;
 
 namespace TokenDesk.WindowsApp;
@@ -10,6 +11,7 @@ public partial class App : System.Windows.Application
     private LocalBridge? _bridge;
     private MainWindow? _window;
     private Forms.NotifyIcon? _trayIcon;
+    private DispatcherTimer? _resetTimer;
 
     public bool IsExiting { get; private set; }
 
@@ -43,6 +45,15 @@ public partial class App : System.Windows.Application
             UpdateTray();
         });
         _bridge.Start();
+
+        _resetTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+        _resetTimer.Tick += (_, _) =>
+        {
+            if (_store == null) return;
+            foreach (var alert in _store.CheckDueResetAlerts(DateTimeOffset.UtcNow))
+                ShowQuotaAlert(alert);
+        };
+        _resetTimer.Start();
 
         var startHidden = e.Args.Any(a => string.Equals(a, "--tray", StringComparison.OrdinalIgnoreCase));
         if (!startHidden)
@@ -100,6 +111,7 @@ public partial class App : System.Windows.Application
     public void ExitApplication()
     {
         IsExiting = true;
+        _resetTimer?.Stop();
         _bridge?.Dispose();
         if (_trayIcon != null)
         {
@@ -131,6 +143,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _resetTimer?.Stop();
         _bridge?.Dispose();
         if (_trayIcon != null)
         {
