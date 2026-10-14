@@ -143,6 +143,30 @@ assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).p
 
 
 
+// Total ChatGPT usage includes focused browsing and confirmed hidden work,
+// but excludes an idle hidden tab. Timing is reported as wall-clock intervals.
+sandbox.document.visibilityState='visible';
+sandbox.document.hasFocus=()=>true;
+const t0=Date.now();
+const foreground=sandbox.__TOKEN_DESK_TASK_TEST_USAGE_INTERVAL__(t0+10000);
+assert(foreground && foreground.reason==='foreground', 'focused chat should count');
+sandbox.document.visibilityState='hidden';
+sandbox.document.hasFocus=()=>false;
+const onBlur=sandbox.__TOKEN_DESK_TASK_TEST_USAGE_INTERVAL__(t0+20000);
+assert(onBlur && onBlur.reason==='foreground','last focused interval must flush on blur');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_USAGE_INTERVAL__(t0+30000),null,
+  'idle hidden tab must not earn session time');
+sandbox.document.querySelectorAll = selector =>
+  selector==='button,[role="button"]'?[stopControl]:[];
+sandbox.__TOKEN_DESK_TASK_TEST_SEND__(true);
+const background=sandbox.__TOKEN_DESK_TASK_TEST_USAGE_INTERVAL__(t0+40000);
+assert(background && background.reason==='task',
+  'confirmed Working task must count while browser tab is hidden');
+sandbox.document.querySelectorAll=()=>[];
+sandbox.__TOKEN_DESK_TASK_TEST_SEND__(true);
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_USAGE_INTERVAL__(t0+50000),null,
+  'completed hidden task must stop counting');
+
 // Regression: generic Work-mode/running DOM markers must not be treated as proof
 // that a ChatGPT task is actively running.
 assert.strictEqual(src.includes('[data-testid*="working"]'), false, 'idle Work-mode UI markers must not trigger working');
