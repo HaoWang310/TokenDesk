@@ -281,18 +281,31 @@ private final class TokenModel: ObservableObject {
     func refreshFreshnessClock(_ date: Date = Date()) {
         freshnessClock = date
         if let taskSnapshotAt = taskSnapshotAt, date.timeIntervalSince(taskSnapshotAt) > 75, !runningTasks.isEmpty {
-            runningTasks = []
+            // Browser closed or disconnected: display the last known task as
+            // unverified, never assert that cloud work is still running.
+            let previous = runningTasks
+            let revised: [RunningChatTask] = previous.compactMap { task in
+                guard date.timeIntervalSince(task.lastSeenAt) < 2 * 60 * 60 else { return nil }
+                if task.phase == .unverified { return task }
+                return RunningChatTask(id: task.id, phase: .unverified,
+                                       modelName: task.modelName,
+                                       title: task.title, pageURL: task.pageURL,
+                                       startedAt: task.startedAt, lastSeenAt: task.lastSeenAt)
+            }
+            if revised != previous { runningTasks = revised }
         }
     }
 
     var runningTaskCount: Int { runningTasks.count }
     var thinkingTaskCount: Int { runningTasks.filter { $0.phase == .thinking }.count }
     var workingTaskCount: Int { runningTasks.filter { $0.phase == .working }.count }
+    var unverifiedTaskCount: Int { runningTasks.filter { $0.phase == .unverified }.count }
 
     var runningTaskSummary: String {
         var parts: [String] = []
         if thinkingTaskCount > 0 { parts.append("思考 \(thinkingTaskCount)") }
         if workingTaskCount > 0 { parts.append("工作 \(workingTaskCount)") }
+        if unverifiedTaskCount > 0 { parts.append("待确认 \(unverifiedTaskCount)") }
         return parts.isEmpty ? "任务 0" : parts.joined(separator: " · ")
     }
 
@@ -789,6 +802,8 @@ private struct RunningTasksSection: View {
         var parts: [String] = []
         if thinking > 0 { parts.append("思考 \(thinking)") }
         if working > 0 { parts.append("工作 \(working)") }
+        let unverified = tasks.filter { $0.phase == .unverified }.count
+        if unverified > 0 { parts.append("待确认 \(unverified)") }
         return parts.isEmpty ? "0" : parts.joined(separator: " · ")
     }
 
@@ -797,19 +812,25 @@ private struct RunningTasksSection: View {
             if let url = URL(string: task.pageURL) { NSWorkspace.shared.open(url) }
         } label: {
             HStack(spacing: 10) {
-                ProgressView()
-                    .controlSize(.small)
-                    .tint(task.phase == .thinking ? Color(red: 0.54, green: 0.69, blue: 1.00) : Color(red: 0.42, green: 0.88, blue: 0.75))
-                    .frame(width: 16)
+                if task.phase == .unverified {
+                    Image(systemName: "clock")
+                        .foregroundColor(.gray)
+                        .frame(width: 16)
+                } else {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(task.phase == .thinking ? Color(red: 0.54, green: 0.69, blue: 1.00) : Color(red: 0.42, green: 0.88, blue: 0.75))
+                        .frame(width: 16)
+                }
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(task.title)
                             .font(.system(size: 10.8, weight: .medium))
                             .foregroundColor(.white.opacity(0.86))
                             .lineLimit(1)
-                        Text(task.phase == .thinking ? "思考" : "工作")
+                        Text(task.phase == .unverified ? "状态待确认" : (task.phase == .thinking ? "思考" : "工作"))
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundColor(task.phase == .thinking ? Color(red: 0.64, green: 0.77, blue: 1.00) : Color(red: 0.50, green: 0.94, blue: 0.80))
+                            .foregroundColor(task.phase == .unverified ? .gray : (task.phase == .thinking ? Color(red: 0.64, green: 0.77, blue: 1.00) : Color(red: 0.50, green: 0.94, blue: 0.80)))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.white.opacity(0.055), in: Capsule())
@@ -823,7 +844,7 @@ private struct RunningTasksSection: View {
                                 .background(Color.white.opacity(0.045), in: Capsule())
                         }
                     }
-                    Text("已运行 " + elapsed(task.startedAt))
+                    Text(task.phase == .unverified ? "网页已关闭或失联 · 无法确认云端是否继续运行" : "已运行 " + elapsed(task.startedAt))
                         .font(.system(size: 9.5, design: .monospaced))
                         .foregroundColor(.white.opacity(0.38))
                 }
