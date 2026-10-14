@@ -58,6 +58,17 @@ assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_CURRENT_MODEL__(),'GPT-6 Think
 pill=fakeNode('6Pro');
 checked=fakeNode('GPT-6 Pro');
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_CURRENT_MODEL__(),'GPT-6 Pro');
+const report=sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__();
+assert.strictEqual(report.scriptVersion,'1.8.4');
+assert.strictEqual(report.reason,'recognized');
+assert.strictEqual(report.model,'GPT-6 Pro');
+assert.strictEqual(report.pickerCount,1);
+assert.strictEqual(report.visiblePickerCount,1);
+assert.strictEqual(report.taggedAssistantMessages,0);
+assert.ok(!('title' in report) && !('url' in report),'diagnostics must exclude URLs and chat titles');
+pill=null;checked=null;
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().reason,'picker-absent');
+
 
 
 // Regression: generic Work-mode/running DOM markers must not be treated as proof
