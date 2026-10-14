@@ -305,6 +305,7 @@
   let lastModel = null;
   let resolvedModel = null;
   let requestedModel = null;
+  let requestedModelReceivedAt = 0;
   let modelRoute = location.pathname;
   let resolvedModelReceivedAt = 0;
   let conversationFetchSeen = 0;
@@ -330,6 +331,7 @@
           candidate.length > 64 ||
           !/^(?:gpt-[a-z0-9][a-z0-9._-]*|o[1-9][a-z0-9._-]*)$/i.test(candidate)) return;
       requestedModel = candidate;
+      requestedModelReceivedAt = Date.now();
       modelRoute = location.pathname;
       // An observed request for the same chat can precede the stream.
       // It must never override a server-confirmed resolved model.
@@ -364,10 +366,12 @@
       const projectRoot = modelRoute.replace(/\/$/, '');
       const projectToChat = projectLanding &&
         location.pathname.startsWith(projectRoot + '/c/');
-      const freshStream = resolvedModel && Date.now() - resolvedModelReceivedAt < 90_000;
+      const freshStream = (resolvedModel && Date.now() - resolvedModelReceivedAt < 90_000) ||
+        (requestedModel && Date.now() - requestedModelReceivedAt < 90_000);
       if (!(freshStream && (rootToChat || projectToChat))) {
         resolvedModel = null;
         requestedModel = null;
+        requestedModelReceivedAt = 0;
         resolvedModelReceivedAt = 0;
         lastModel = null;
       }
