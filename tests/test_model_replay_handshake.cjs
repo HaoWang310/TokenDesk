@@ -31,6 +31,8 @@ vm.runInNewContext(mainSrc,main);
   await new Promise(resolve=>setTimeout(resolve,70));
   const output={
     ...common,
+    // Do not start the production heartbeat loop inside this isolated test.
+    setTimeout:()=>0,
     document:{documentElement:null,title:'Model probe - ChatGPT',
       querySelectorAll:()=>[],addEventListener(){}},
     chrome:{runtime:{lastError:null,onMessage:{addListener(){}},
