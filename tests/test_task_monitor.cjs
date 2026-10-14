@@ -115,6 +115,17 @@ sandbox.location.href='https://chatgpt.com/c/new-chat-id';
 sandbox.__TOKEN_DESK_TASK_TEST_SEND__(true);
 assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.model,
   'gpt-6-thinking','new-chat redirect must preserve fresh stream model');
+sandbox.location.pathname='/g/g-p-example-project';
+sandbox.location.href='https://chatgpt.com/g/g-p-example-project';
+sandbox.__TOKEN_DESK_TASK_TEST_SEND__(true);
+windowListeners.message({source:pageWindow,origin:'https://chatgpt.com',
+  data:{channel:'TOKEN_DESK_NETWORK_V1',type:'MODEL',source:'resolved_model_slug',model:'gpt-6-thinking'}});
+sandbox.location.pathname='/g/g-p-example-project/c/new-project-chat';
+sandbox.location.href='https://chatgpt.com/g/g-p-example-project/c/new-project-chat';
+sandbox.__TOKEN_DESK_TASK_TEST_SEND__(true);
+assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.model,
+  'gpt-6-thinking','project new-chat redirect must preserve network model');
+
 sandbox.location.pathname='/c/unrelated-conversation';
 sandbox.location.href='https://chatgpt.com/c/unrelated-conversation';
 sandbox.__TOKEN_DESK_TASK_TEST_SEND__(true);
