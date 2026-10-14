@@ -365,14 +365,16 @@ function preserveTaskModel(task) {
   for (const [id, observed] of observedModels) {
     if (now-observed.at > MODEL_OBSERVATION_TTL_MS) observedModels.delete(id);
   }
-  if (task.model && /^(?:gpt-[a-z0-9][a-z0-9._-]*|o[1-9][a-z0-9._-]*)$/i.test(task.model)) {
-    observedModels.set(task.id, {model:task.model,at:now});
-  } else if (!task.model) {
-    const observed = observedModels.get(task.id);
-    if (observed && now-observed.at <= MODEL_OBSERVATION_TTL_MS) {
-      task.model = observed.model;
-    }
-  }
+  const existing = observedModels.get(task.id);
+  const confirmed = /^(?:gpt-[a-z0-9][a-z0-9._-]*|o[1-9][a-z0-9._-]*)$/i.test(task.model);
+  const selected = /^请求模型：(gpt-[a-z0-9][a-z0-9._-]*|o[1-9][a-z0-9._-]*)$/i.test(task.model);
+  if (confirmed) observedModels.set(task.id,{model:task.model,rank:2,at:now});
+  else if (selected && (!existing || existing.rank < 2)) {
+    observedModels.set(task.id,{model:task.model,rank:1,at:now});
+  } else if ((!task.model || task.model.startsWith('模式：')) &&
+             existing && now-existing.at < MODEL_OBSERVATION_TTL_MS) {
+    task.model = existing.model;
+  } else if (selected && existing?.rank === 2) task.model = existing.model;
   return task;
 }
 
