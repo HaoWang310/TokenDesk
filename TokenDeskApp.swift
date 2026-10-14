@@ -835,7 +835,7 @@ private struct RunningTasksSection: View {
                             .padding(.vertical, 2)
                             .background(Color.white.opacity(0.055), in: Capsule())
                         if let modelName = task.modelName {
-                            Text(modelName.hasPrefix("模式：") ? modelName : "模型：" + modelName)
+                            Text((modelName.hasPrefix("模式：") || modelName.hasPrefix("请求模型：")) ? modelName : "模型：" + modelName)
                                 .font(.system(size: 8.5, weight: .medium))
                                 .foregroundColor(Color(red: 0.72, green: 0.78, blue: 1.00))
                                 .lineLimit(1)
