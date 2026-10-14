@@ -354,6 +354,96 @@ async function sendUsage(payload) {
 
 
 const taskStates = new Map();
+const COMPLETED_NOTICE_SETTING = 'tokendeskTaskCompletionNoticeEnabledV1';
+const COMPLETED_NOTICE_HISTORY = 'tokendeskTaskCompletionNoticeHistoryV1';
+const COMPLETED_NOTICE_LINKS = 'tokendeskTaskCompletionNoticeLinksV1';
+const COMPLETED_NOTICE_PREFIX = 'tokendesk-complete-';
+const COMPLETED_NOTICE_DELAY_MS = 2500;
+const completionPending = new Map();
+const COMPLETION_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAB10lEQVR42u2bu3HDMAxAZZxnSJcJkhmiKktkCVWZIpWX8BKq7Blcp8tljKTSHU9HiQBIQCAJVi4sHd8jQIq/09Pzy9/QcYGh8+ICXEDn5Zzz8NvtywTEffxkP3uijgJWoEvJgJbgOXVER0DsxY+Piwno1+vEjgSUgDW8FfCUCIwEaAU+VjdMOkAr8FwJ0BI8RwJwXlijBP8SpAgIQ6bG1o/VfSsNPAJcgM8GbXy6HtXnnC1Ab/1PQwZYgi/1nCkBuRDSEsAyvIYEsA4/j5OoBKgBfh6nYR4nEQlgFX5LyO/Pdx8fQkvrr8v77dK+gC14831AifDfg19av2SaVTMXKB36JgVo5b26AExOa+a9qoBwLM/J+yoFrMGorSwNLy4gBoCVogFfXEBs/r4ngZv3JdcJVDpBTCQc0fqqwyAWShNeRMBeeKbgMPCll8lEIiBHgia8aApgJSy/U2KkFkhF+4CUhKPhVTrB3MpLL42rjAJcCI19AbWNkRCmy52hIyGbWBBxAZoCwvN1GvtzUiWs+9aZQY8AqskaW58lYB0yNUmgHJndjYAaJVDPCydToCYJnMPSflyecmOkhgsTFHjyMJhzN8ciPDkCrEaE6qUpnwu4ABfgAloq/yec3yrH8jTrAAAAAElFTkSuQmCC';
+
+function completionRunKey(task) {
+  return task.id + ':' + task.startedAt;
+}
+
+function cancelPendingCompletion(taskId) {
+  const pending = completionPending.get(taskId);
+  if (!pending) return;
+  clearTimeout(pending.timer);
+  completionPending.delete(taskId);
+}
+
+function scheduleCompletionNotice(task, previous) {
+  if (!task.completionVerified || !previous?.active ||
+      previous.id !== task.id || !validChatGPTURL(previous.pageURL) ||
+      !chrome.notifications?.create) return;
+  const key = completionRunKey(previous);
+  if (completionPending.has(task.id)) return;
+  // Wait for a stable idle state; a new running heartbeat, navigation or
+  // tab closure cancels the notification. Avoid transient Work handoffs.
+  const timer = setTimeout(() => {
+    completionPending.delete(task.id);
+    showCompletionNotice(key,previous).catch(()=>{});
+  },COMPLETED_NOTICE_DELAY_MS);
+  completionPending.set(task.id,{timer, tabId:task.tabId, key});
+}
+
+async function showCompletionNotice(runKey, task) {
+  const keys = await chrome.storage.local.get({
+    [COMPLETED_NOTICE_SETTING]:true,
+    [COMPLETED_NOTICE_HISTORY]:{},
+    [COMPLETED_NOTICE_LINKS]:{}
+  });
+  if (keys[COMPLETED_NOTICE_SETTING] === false) return;
+  const current = taskStates.get(task.tabId);
+  if (current?.active && current.id === task.id) return;
+  const now = Date.now();
+  const oldHistory = keys[COMPLETED_NOTICE_HISTORY] || {};
+  const history = Object.fromEntries(Object.entries(oldHistory)
+    .filter(([,time]) => Number.isFinite(time) && now-time < 2*24*60*60*1000));
+  if (history[runKey]) return;
+  const noticeId = COMPLETED_NOTICE_PREFIX + now + '-' +
+    Math.random().toString(36).slice(2,10);
+  // Use generic text: task titles and answer content must not leak to
+  // operating system lock-screen notifications.
+  await chrome.notifications.create(noticeId,{
+    type:'basic',iconUrl:COMPLETION_ICON,
+    title:'ChatGPT 任务已完成',
+    message:'任务已完成，注意查看。点击打开对应对话。',
+    priority:1
+  });
+  const oldLinks = keys[COMPLETED_NOTICE_LINKS] || {};
+  const links = Object.fromEntries(Object.entries(oldLinks)
+    .filter(([,entry]) => entry && Number.isFinite(entry.at) &&
+      now-entry.at < 2*24*60*60*1000 && validChatGPTURL(entry.url)));
+  links[noticeId] = {url:task.pageURL,at:now,tabId:task.tabId};
+  history[runKey] = now;
+  await chrome.storage.local.set({
+    [COMPLETED_NOTICE_HISTORY]:history,
+    [COMPLETED_NOTICE_LINKS]:links
+  });
+}
+
+if (chrome.notifications?.onClicked) {
+  chrome.notifications.onClicked.addListener(async noticeId => {
+    if (!noticeId.startsWith(COMPLETED_NOTICE_PREFIX)) return;
+    const data = await chrome.storage.local.get({[COMPLETED_NOTICE_LINKS]:{}});
+    const entry = data[COMPLETED_NOTICE_LINKS]?.[noticeId];
+    if (!entry || !validChatGPTURL(entry.url)) return;
+    try {
+      const tab = await chrome.tabs.get(entry.tabId);
+      if (tab && validChatGPTURL(tab.url) && tab.url === entry.url) {
+        await chrome.tabs.update(tab.id,{active:true});
+        if (Number.isInteger(tab.windowId)) await chrome.windows.update(tab.windowId,{focused:true});
+      } else await chrome.tabs.create({url:entry.url});
+    } catch {
+      await chrome.tabs.create({url:entry.url});
+    }
+    chrome.notifications.clear(noticeId).catch(()=>{});
+  });
+}
+
+
 const observedModels = new Map();
 const MODEL_OBSERVATION_TTL_MS = 2 * 60 * 60 * 1000;
 const TASK_HEARTBEAT_GRACE_MS = 150_000; // Chrome throttles hidden tabs; 45s was too strict.
@@ -448,6 +538,7 @@ function sanitizeTaskMessage(message, sender) {
     id: p.id,
     active: p.active,
     unverified: p.unverified === true,
+    completionVerified: p.completionVerified === true,
     phase: p.phase === 'thinking' ? 'thinking' : 'working',
     model,
     usageDay,
@@ -764,12 +855,17 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
     const task = sanitizeTaskMessage(message, sender);
     if (!task) return false;
     preserveTaskModel(task);
+    const previous = taskStates.get(task.tabId);
     if (task.active) {
+      cancelPendingCompletion(task.id);
       taskStates.set(task.tabId, task);
       if (unverifiedTasks.delete(task.id)) saveUnverifiedTasks();
     } else if (task.unverified) {
+      cancelPendingCompletion(task.id);
       detachTask(task.tabId);
     } else {
+      if (task.completionVerified) scheduleCompletionNotice(task,previous);
+      else cancelPendingCompletion(task.id);
       taskStates.delete(task.tabId);
       if (unverifiedTasks.delete(task.id)) saveUnverifiedTasks();
     }
@@ -801,12 +897,18 @@ chrome.runtime.onStartup.addListener(()=>{
 });
 if (chrome.tabs?.onRemoved) {
   chrome.tabs.onRemoved.addListener(tabId=>{
+    for (const [taskId,entry] of completionPending) {
+      if (entry.tabId === tabId) cancelPendingCompletion(taskId);
+    }
     if (detachTask(tabId)) scheduleTaskPublish();
   });
 }
 if (chrome.tabs?.onUpdated) {
   chrome.tabs.onUpdated.addListener((tabId,changeInfo)=>{
     if (changeInfo.status==='loading' || changeInfo.url) {
+      for (const [taskId,entry] of completionPending) {
+        if (entry.tabId === tabId) cancelPendingCompletion(taskId);
+      }
       if (detachTask(tabId)) scheduleTaskPublish();
     }
   });
