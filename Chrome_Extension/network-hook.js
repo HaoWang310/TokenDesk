@@ -60,7 +60,7 @@
       // fully materialized message object.
       const patchPath = typeof node.p === 'string' ? node.p :
                         (typeof node.path === 'string' ? node.path : '');
-      if (/(?:^|\\/)resolved_model_slug$/.test(patchPath)) {
+      if (patchPath === 'resolved_model_slug' || patchPath.endsWith('/resolved_model_slug')) {
         const patchModel = validResolvedSlug(node.v ?? node.value);
         if (patchModel) return patchModel;
       }
