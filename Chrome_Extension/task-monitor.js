@@ -420,10 +420,8 @@
 
   function sendState(force = false) {
     const now = Date.now();
-    // Resolve route before evaluating the task evidence to avoid carrying a
-    // stale stream from another conversation into the new chat.
-    const nextPhase = activePhase();
-    const next = nextPhase !== null;
+    // Reset per-conversation stream state before measuring the next phase,
+    // rather than allowing an old chat's in-flight stream to affect this one.
     // Keep the last confirmed UI label while a transient picker redraws.
     if (location.pathname !== modelRoute) {
       // ChatGPT can begin a new conversation on / and navigate to /c/<id>
@@ -449,6 +447,8 @@
       }
       modelRoute = location.pathname;
     }
+    const nextPhase = activePhase();
+    const next = nextPhase !== null;
     const model = resolvedModel ||
       (requestedModel ? '请求模型：' + requestedModel : null) ||
       currentModelLabel() || lastModel;
