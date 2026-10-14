@@ -168,7 +168,7 @@
                 </StackPanel>
             </Border>
 
-            <TextBlock Text="TokenDesk Windows v1.2.8 · 本机仅监听 127.0.0.1:18743"
+            <TextBlock Text="TokenDesk Windows v1.2.9 · 本机仅监听 127.0.0.1:18743"
                        HorizontalAlignment="Center" Foreground="#555E6E" FontSize="9" Margin="0,14,0,2"/>
         </StackPanel>
     </ScrollViewer>
