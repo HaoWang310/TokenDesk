@@ -1,4 +1,4 @@
-# TokenDesk for Windows v1.1.0
+# TokenDesk for Windows v1.1.1
 
 Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机桥接协议。
 
@@ -41,3 +41,5 @@ Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机
 ## 隐私
 
 Windows 端只接收净化后的额度字段与任务元数据（标题、URL、运行阶段、时间）。不会从 Chrome 扩展传输 ChatGPT 对话正文、密码、Cookie 或 bearer token 到 TokenDesk 桌面端。
+
+- v1.1.1 修复空闲 ChatGPT Work 模式标签页被误判为“工作”的问题。
