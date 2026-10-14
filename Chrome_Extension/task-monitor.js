@@ -356,7 +356,11 @@
       modelRoute = location.pathname;
     }
     const model = resolvedModel || currentModelLabel() || lastModel;
-    const usageSeconds = 0; // Activity is sent by flushActiveUsage, not task updates.
+    const usageSeconds = 0; // Session intervals are sent separately.
+    // Record time up to a verified task start/stop boundary BEFORE updating
+    // active. Otherwise the previous idle period becomes counted as work,
+    // or the final portion of a completed task is silently dropped.
+    if (next !== active) flushActiveUsage();
     if (next && !active) startedAt = now;
     if (!next) startedAt = null;
     const changed = next !== active || nextPhase !== phase || model !== lastModel;
@@ -397,7 +401,9 @@
       addEventListener(type, noteInteraction, {passive:true, capture:true});
     }
     addEventListener('focus', () => {
-      usageTickAt = Date.now();
+      // Focus events bubble/capture from editor controls too. Do not discard
+      // elapsed time whenever the user clicks between ChatGPT input fields.
+      if (!previouslyFocused) usageTickAt = Date.now();
       previouslyFocused = true;
       noteInteraction();
     }, true);
