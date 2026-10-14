@@ -56,6 +56,14 @@
       if (!node || typeof node !== 'object' || depth > 7) continue;
       const found = validResolvedSlug(node.resolved_model_slug);
       if (found) return found;
+      // Some ChatGPT SSE variants return a JSON patch instead of a
+      // fully materialized message object.
+      const patchPath = typeof node.p === 'string' ? node.p :
+                        (typeof node.path === 'string' ? node.path : '');
+      if (/(?:^|\\/)resolved_model_slug$/.test(patchPath)) {
+        const patchModel = validResolvedSlug(node.v ?? node.value);
+        if (patchModel) return patchModel;
+      }
       // Keep only metadata-bearing tree paths. Do not inspect user/assistant
       // content, tool arguments, attachment data or message text.
       for (const [key, value] of Object.entries(node)) {
@@ -81,11 +89,13 @@
     let dataLines = [];
     let scannedBytes = 0;
     let found = null;
+    let status = 'stream-ended';
+    emit('MODEL_TRACE', {status:'stream-observed'});
     // Limit total bytes and observation time. Never buffer a complete
     // conversation or delay the app's original Response consumer.
     let timedOut = false;
     const timeoutId = typeof setTimeout === 'function'
-      ? setTimeout(() => { timedOut=true; reader.cancel().catch(()=>{}); }, 15000) : null;
+      ? setTimeout(() => { timedOut=true; status='timeout'; reader.cancel().catch(()=>{}); }, 180000) : null;
 
     function processEvent() {
       if (!dataLines.length) return null;
@@ -97,7 +107,7 @@
     }
 
     try {
-      while (!found && !timedOut && scannedBytes < 196608) {
+      while (!found && !timedOut && scannedBytes < 2097152) {
         const {value,done} = await reader.read();
         if (done) break;
         scannedBytes += value.byteLength;
@@ -116,11 +126,23 @@
             const data = line.slice(5).trimStart();
             if (dataLines.join('').length + data.length < 50000) dataLines.push(data);
             else dataLines=[];
+            // In ChatGPT's streaming transport, model metadata may appear as a
+            // standalone JSON data line before an SSE blank-line delimiter.
+            // Parse it immediately so prolonged streams cannot hide the value.
+            if (!found && data.length < 50000 && data.startsWith('{')) {
+              try { found = resolvedModelFromEvent(JSON.parse(data)); } catch {}
+              if (found) break;
+            }
           }
         }
       }
       if (!found) found=processEvent();
-      if (found) emit('MODEL', {model:found,source:'resolved_model_slug'});
+      if (found) {
+        emit('MODEL', {model:found,source:'resolved_model_slug'});
+      } else {
+        if (scannedBytes >= 2097152) status='byte-limit';
+        emit('MODEL_TRACE', {status});
+      }
     } catch {} finally {
       if (timeoutId !== null) clearTimeout(timeoutId);
       try { await reader.cancel(); } catch {}
@@ -222,9 +244,13 @@
       if (isUsageURL(url)) rememberFetchRequest(input, init);
       const response = await nativeFetch(input, init);
       if (isUsageURL(url)) inspectResponse(response.clone(), url);
-      if (isConversationURL(url) && response.ok &&
-          String(response.headers?.get?.('content-type') || '').includes('text/event-stream')) {
-        inspectConversationStream(response.clone(), url).catch(()=>{});
+      if (isConversationURL(url)) {
+        emit('MODEL_TRACE', {status:'conversation-fetch-seen'});
+        if (response.ok && String(response.headers?.get?.('content-type') || '').includes('text/event-stream')) {
+          inspectConversationStream(response.clone(), url).catch(()=>{});
+        } else {
+          emit('MODEL_TRACE', {status:'not-event-stream'});
+        }
       }
       return response;
     };
