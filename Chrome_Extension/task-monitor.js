@@ -126,16 +126,19 @@
         el.getAttribute('title') || el.textContent
       ))
       .filter(Boolean).slice(0, 3);
-    const model = resolvedModel || currentModelLabel();
+    const model = resolvedModel ||
+      (requestedModel ? '请求模型：' + requestedModel : null) || currentModelLabel();
     const taggedAssistantMessages = document.querySelectorAll(
       '[data-message-author-role="assistant"][data-message-model-slug]'
     ).length;
     return {
-      ok: true, scriptVersion: '1.8.8',
+      ok: true, scriptVersion: '1.8.11',
       activeTask: active,
       model: model || '',
       lastModel: lastModel || '',
-      modelSource: resolvedModel ? 'resolved_model_slug' : 'page-selector',
+      requestModelSeen: requestedModel ? true : false,
+      modelSource: resolvedModel ? 'resolved_model_slug' :
+        requestedModel ? 'request_body' : 'page-selector',
       conversationFetchSeen,
       streamSeen,
       lastStreamStatus,
@@ -301,6 +304,7 @@
   let pending = false;
   let lastModel = null;
   let resolvedModel = null;
+  let requestedModel = null;
   let modelRoute = location.pathname;
   let resolvedModelReceivedAt = 0;
   let conversationFetchSeen = 0;
@@ -318,6 +322,19 @@
       if (status === 'conversation-fetch-seen') conversationFetchSeen++;
       if (status === 'stream-observed') streamSeen++;
       lastStreamStatus = status;
+      return;
+    }
+    if (detail.type === 'REQUEST_MODEL') {
+      const candidate = detail.model;
+      if (detail.source !== 'request_body' || typeof candidate !== 'string' ||
+          candidate.length > 64 ||
+          !/^(?:gpt-[a-z0-9][a-z0-9._-]*|o[1-9][a-z0-9._-]*)$/i.test(candidate)) return;
+      requestedModel = candidate;
+      modelRoute = location.pathname;
+      // An observed request for the same chat can precede the stream.
+      // It must never override a server-confirmed resolved model.
+      if (!resolvedModel) lastStreamStatus = 'request-model-found';
+      sendState(true);
       return;
     }
     if (detail.type !== 'MODEL') return;
@@ -350,12 +367,15 @@
       const freshStream = resolvedModel && Date.now() - resolvedModelReceivedAt < 90_000;
       if (!(freshStream && (rootToChat || projectToChat))) {
         resolvedModel = null;
+        requestedModel = null;
         resolvedModelReceivedAt = 0;
         lastModel = null;
       }
       modelRoute = location.pathname;
     }
-    const model = resolvedModel || currentModelLabel() || lastModel;
+    const model = resolvedModel ||
+      (requestedModel ? '请求模型：' + requestedModel : null) ||
+      currentModelLabel() || lastModel;
     const usageSeconds = 0; // Session intervals are sent separately.
     // Record time up to a verified task start/stop boundary BEFORE updating
     // active. Otherwise the previous idle period becomes counted as work,
