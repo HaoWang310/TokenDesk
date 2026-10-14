@@ -6,6 +6,15 @@ TokenDesk 是面向 macOS 与 Windows 的 ChatGPT Work / Codex 剩余额度与�
 
 **Chrome 后台主动查询 → 本机 TokenDesk → 菜单栏 / 浮窗 / 额度历史**
 
+### 模型识别调试（只更新扩展，不必重装桌面程序）
+
+- 桌面端 Windows v1.2.13 / macOS v1.8.10 的 `/tasks` 桥接字段不变。网页模型识别修复通常只需更新 Chrome 扩展。
+- 从 GitHub Actions 的 **Verify and package TokenDesk extension** 下载最新的 `TokenDesk-Chrome-Extension` 工件，解压到临时文件夹。
+- **保留原来的 Chrome_Extension 文件夹路径**，将新工件文件覆盖到这个现有文件夹里，不要删掉旧扩展后创建一个新路径（避免扩展 ID 及本地配对/统计记录变化）。
+- 打开 `chrome://extensions`，在 TokenDesk 卡片点击**重新加载**，确认版本号，之后对打开的 ChatGPT 网页按 `Ctrl + Shift + R` 刷新。
+- 发送一条**新的** ChatGPT 消息，打开 TokenDesk 扩展的**检查模型识别**。新诊断会显示主世界网络监听是否连接、`fetch` 是否仍由扩展接管、SSE 流次数和模型来源。
+- 如果网络监听未连接或未捕获新的请求，请把扩展诊断截图发来；无需重新安装桌面端。模型检测依赖 ChatGPT 非公开网页数据，不保证每个 Work 子任务都提供模型字段。
+
 ## Windows v1.2.13
 
 Windows v1.2.13 保留四类额度提醒，并新增每日使用时间、一周柱状统计和运行任务模型显示。
