@@ -25,6 +25,40 @@ assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTION__('Cancel'),false);
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_MODEL__('GPT-5.6 Sol'),'GPT-5.6 Sol');
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_MODEL__('Model: GPT-5.6 Thinking'),'GPT-5.6 Thinking');
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_MODEL__('ChatGPT'),null);
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_MODEL__('GPT-6 Thinking'),'GPT-6 Thinking');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_MODEL__('6Pro'),'模式：6Pro');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_MODEL__('Instant'),'模式：Instant');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_MODEL__('Thinking'),'模式：Thinking');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_MODEL__('均衡'),'模式：均衡');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_MODEL__('最新的'),'模式：最新的');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_MODEL__('Select ChatGPT model'),null);
+// Simulate the Sept 2026 ChatGPT composer: picker has no data-testid or
+// aria-label; only the __composer-pill class and text "6Pro".
+let pill=null;
+let checked=null;
+function fakeNode(text, attrs={}) {
+  return {
+    isConnected:true,
+    textContent:text,
+    getAttribute:key=>attrs[key] ?? null,
+    getBoundingClientRect:()=>({left:100,right:200,top:100,bottom:125,width:100,height:25})
+  };
+}
+sandbox.innerWidth=1200;
+sandbox.innerHeight=800;
+sandbox.document.querySelectorAll = selector => {
+  if (selector.includes('composer-intelligence-picker-content') && selector.includes('menuitemradio')) return checked?[checked]:[];
+  if (selector.includes('__composer-pill')) return pill?[pill]:[];
+  return [];
+};
+pill=fakeNode('6Pro');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_CURRENT_MODEL__(),'模式：6Pro');
+pill=fakeNode('GPT-6 Thinking');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_CURRENT_MODEL__(),'GPT-6 Thinking');
+pill=fakeNode('6Pro');
+checked=fakeNode('GPT-6 Pro');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_CURRENT_MODEL__(),'GPT-6 Pro');
+
 
 // Regression: generic Work-mode/running DOM markers must not be treated as proof
 // that a ChatGPT task is actively running.
