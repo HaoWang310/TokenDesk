@@ -202,7 +202,7 @@
     usageTickAt = now;
     const foreground = document.visibilityState === 'visible' &&
       document.hasFocus() && now - lastInteractionAt <= usageIdleMs;
-    const confirmedWork = active && activePhase() !== null;
+    const confirmedWork = active && now - lastSent <= 45_000;
     if (now <= startAt || (!foreground && !confirmedWork)) return null;
     return {startAt, endAt:now, reason:foreground ? 'foreground' : 'task'};
   }
