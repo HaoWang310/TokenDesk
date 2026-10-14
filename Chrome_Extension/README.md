@@ -1,4 +1,4 @@
-# TokenDesk Chrome Extension v1.7.6
+# TokenDesk Chrome Extension v1.7.7
 
 - 首选：Chrome service worker 后台主动查询 ChatGPT 用量，约每 30 秒一次。
 - 无需打开 ChatGPT 或“设置 → 用量”页面。
@@ -9,6 +9,8 @@
 - DOM 扫描默认关闭，仅在后台主动查询失败时临时启用约 2 分钟，然后自动关闭。
 
 
-## v1.7.6 task monitor
+## v1.7.7 task monitor
 
 The extension reports currently active ChatGPT web tasks across open Chrome tabs and distinguishes `thinking` from `working`. Completed, stopped, closed, or stale tasks are removed automatically. It reads only page title plus active UI state for this feature; chat message text is not sent to the Mac app.
+
+- 修复空闲 Work 模式标签页被误判为“工作”的问题。
