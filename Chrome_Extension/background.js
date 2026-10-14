@@ -25,6 +25,7 @@ const ACTIVE_USAGE_KEY = 'tokendeskDailyActiveUsageV1';
 const WEEKLY_USAGE_KEY = 'tokendeskDailyWeeklyQuotaUsedV1';
 const WEEKLY_BASELINE_KEY = 'tokendeskWeeklyQuotaBaselineV1';
 let statsWriteChain = Promise.resolve();
+let lastPrunedWeek = null;
 
 function localDayKey(date = new Date()) {
   const y = date.getFullYear();
@@ -114,6 +115,25 @@ function queueWeeklyQuotaSample(payload) {
 }
 
 async function usageDaysSnapshot() {
+  const week = weekStartKey();
+
+  // At the start of a new local reporting week, physically discard last
+  // week's stored daily totals. Serialization prevents a simultaneous usage
+  // heartbeat from being overwritten by this housekeeping operation.
+  if (lastPrunedWeek !== week) {
+    statsWriteChain = statsWriteChain.then(async () => {
+      const old = await chrome.storage.local.get({
+        [ACTIVE_USAGE_KEY]:{},
+        [WEEKLY_USAGE_KEY]:{}
+      });
+      await chrome.storage.local.set({
+        [ACTIVE_USAGE_KEY]:pruneDayMap(old[ACTIVE_USAGE_KEY]),
+        [WEEKLY_USAGE_KEY]:pruneDayMap(old[WEEKLY_USAGE_KEY])
+      });
+    }).catch(() => {});
+    lastPrunedWeek = week;
+  }
+
   await statsWriteChain.catch(() => {});
   const stored = await chrome.storage.local.get({
     [ACTIVE_USAGE_KEY]:{},
