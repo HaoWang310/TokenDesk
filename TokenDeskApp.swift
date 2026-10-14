@@ -3,7 +3,7 @@ import SwiftUI
 import Combine
 import UserNotifications
 
-// TokenDesk v1.7.7 monitors quota, running ChatGPT web tasks, and quota alerts.
+// TokenDesk v1.8.0 monitors quota, running ChatGPT web tasks, and quota alerts.
 // Data path: Chrome extension -> loopback BrowserBridge -> quota history + live task state.
 // There is no Codex CLI process launch, ~/.codex log scan, token accounting,
 // Admin Usage API key, or background Codex polling in this build.
@@ -985,7 +985,7 @@ private struct TokenDeskSettingsView: View {
                 .font(.system(size: 11))
                 .foregroundColor(.white.opacity(0.58))
                 .fixedSize(horizontal: false, vertical: true)
-            Text("v1.7.7 新增额度提醒：5小时/每周剩余20%或以下提醒，并在对应额度刷新时发送系统通知。")
+            Text("v1.8.0 新增额度提醒：5小时/每周剩余20%或以下提醒，并在对应额度刷新时发送系统通知。")
                 .font(.system(size: 10.5))
                 .foregroundColor(.white.opacity(0.43))
                 .fixedSize(horizontal: false, vertical: true)
