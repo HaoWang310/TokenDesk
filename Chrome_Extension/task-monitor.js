@@ -132,7 +132,7 @@
       '[data-message-author-role="assistant"][data-message-model-slug]'
     ).length;
     return {
-      ok: true, scriptVersion: '1.8.12',
+      ok: true, scriptVersion: '1.8.13',
       activeTask: active,
       model: model || '',
       lastModel: lastModel || '',
