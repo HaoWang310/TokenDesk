@@ -23,7 +23,7 @@ Current data path:
 
 After the first pairing, Chrome can stay in the background. You do **not** need to keep ChatGPT or the Usage page open.
 
-## Current macOS version: v1.8.1
+## Current macOS version: v1.8.2
 
 Both desktop apps now support quota notifications:
 - 5-hour quota at 20% remaining or below
@@ -52,7 +52,7 @@ v1.8.0 adds macOS 12 Monterey / Intel x86_64 local-build compatibility and fixes
 - local macOS build/install flow
 - adaptive macOS menu-bar icon
 
-## Windows v1.2.4
+## Windows v1.2.5
 
 The Windows version is under `Windows/` and is built with **.NET 8 + WPF**.
 
