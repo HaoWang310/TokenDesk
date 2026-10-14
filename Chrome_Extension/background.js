@@ -33,25 +33,30 @@ function localDayKey(date = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
-function recentLocalDayKeys(count = 7) {
+// The browser's local calendar week: Monday through Sunday.
+function currentWeekDayKeys(now = new Date()) {
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
   const keys = [];
-  const base = new Date();
-  base.setHours(12, 0, 0, 0);
-  for (let i = count - 1; i >= 0; i--) {
-    const d = new Date(base);
-    d.setDate(base.getDate() - i);
-    keys.push(localDayKey(d));
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + i);
+    keys.push(localDayKey(day));
   }
   return keys;
 }
 
-function pruneDayMap(input, keep = 8) {
+function weekStartKey(date = new Date()) {
+  return currentWeekDayKeys(date)[0];
+}
+
+// Keep this week only. Old-week values never carry into a new Monday.
+function pruneDayMap(input, now = new Date()) {
+  const allowed = new Set(currentWeekDayKeys(now));
+  const today = localDayKey(now);
   const out = {};
-  const keys = Object.keys(input || {})
-    .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k))
-    .sort()
-    .slice(-keep);
-  for (const key of keys) {
+  for (const key of Object.keys(input || {})) {
+    if (!allowed.has(key) || key > today) continue;
     const value = Number(input[key]);
     if (Number.isFinite(value) && value >= 0) out[key] = value;
   }
@@ -65,9 +70,11 @@ function queueActiveUsage(dayKey, seconds) {
   }
   statsWriteChain = statsWriteChain.then(async () => {
     const stored = await chrome.storage.local.get({[ACTIVE_USAGE_KEY]:{}});
-    const map = pruneDayMap(stored[ACTIVE_USAGE_KEY], 8);
+    const map = pruneDayMap(stored[ACTIVE_USAGE_KEY]);
+    // Ignore delayed previous-week heartbeats after Monday's reset.
+    if (!currentWeekDayKeys().includes(dayKey) || dayKey > localDayKey()) return;
     map[dayKey] = Math.min(24 * 60 * 60, Math.max(0, Math.round((map[dayKey] || 0) + seconds)));
-    await chrome.storage.local.set({[ACTIVE_USAGE_KEY]:pruneDayMap(map, 8)});
+    await chrome.storage.local.set({[ACTIVE_USAGE_KEY]:pruneDayMap(map)});
   }).catch(() => {});
   return statsWriteChain;
 }
@@ -83,9 +90,13 @@ function queueWeeklyQuotaSample(payload) {
       [WEEKLY_USAGE_KEY]:{},
       [WEEKLY_BASELINE_KEY]:null
     });
-    const map = pruneDayMap(stored[WEEKLY_USAGE_KEY], 8);
+    const map = pruneDayMap(stored[WEEKLY_USAGE_KEY]);
     const previous = stored[WEEKLY_BASELINE_KEY];
-    if (previous && good(previous.remaining)) {
+    // A Monday reporting-week boundary starts a new baseline even if the
+    // underlying ChatGPT weekly quota itself resets on a different day.
+    const sameReportingWeek = previous && Number.isFinite(Number(previous.at)) &&
+      weekStartKey(new Date(Number(previous.at))) === weekStartKey();
+    if (previous && good(previous.remaining) && sameReportingWeek) {
       const sameCycle = previous.resetAt && resetAt
         ? Number(previous.resetAt) === Number(resetAt)
         : true;
@@ -95,7 +106,7 @@ function queueWeeklyQuotaSample(payload) {
       }
     }
     await chrome.storage.local.set({
-      [WEEKLY_USAGE_KEY]:pruneDayMap(map, 8),
+      [WEEKLY_USAGE_KEY]:pruneDayMap(map),
       [WEEKLY_BASELINE_KEY]:{remaining,resetAt,at:Date.now()}
     });
   }).catch(() => {});
@@ -108,9 +119,9 @@ async function usageDaysSnapshot() {
     [ACTIVE_USAGE_KEY]:{},
     [WEEKLY_USAGE_KEY]:{}
   });
-  const active = pruneDayMap(stored[ACTIVE_USAGE_KEY], 8);
-  const quota = pruneDayMap(stored[WEEKLY_USAGE_KEY], 8);
-  return recentLocalDayKeys(7).map(day => ({
+  const active = pruneDayMap(stored[ACTIVE_USAGE_KEY]);
+  const quota = pruneDayMap(stored[WEEKLY_USAGE_KEY]);
+  return currentWeekDayKeys().map(day => ({
     day,
     activeSeconds: Math.max(0, Math.min(86_400, Math.round(active[day] || 0))),
     weeklyQuotaUsed: Math.max(0, Math.min(500, Math.round(quota[day] || 0)))
@@ -548,4 +559,5 @@ refreshTaskTabs(true).catch(()=>{});
 // Test hooks used only by the bundled Node test; harmless in Chrome.
 if (globalThis.__TOKEN_DESK_TEST__) {
   globalThis.__TOKEN_DESK_TEST_PARSE__ = parseUsageJSON;
+  globalThis.__TOKEN_DESK_TEST_WEEK__ = { currentWeekDayKeys, weekStartKey, pruneDayMap };
 }
