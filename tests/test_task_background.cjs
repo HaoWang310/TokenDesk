@@ -49,6 +49,13 @@ function sendTask(active){
   assert.strictEqual(badRet,false);
   await new Promise(r=>setTimeout(r,250));
   assert.strictEqual(lastTaskBody.usageDays.find(d=>d.day===day).activeSeconds,10);
+  let diagnostics=null;
+  const ret=receiver({type:'TOKEN_DESK_DIAGNOSE_MODELS'},{},r=>diagnostics=r);
+  assert.strictEqual(ret,true);
+  await new Promise(r=>setTimeout(r,100));
+  assert(diagnostics && diagnostics.ok);
+  assert.strictEqual(diagnostics.tabCount,0);
+  assert.deepStrictEqual(diagnostics.reports,[]);
   sendTask(false); await new Promise(r=>setTimeout(r,250));
   assert.strictEqual(lastTaskBody.tasks.length,0);
   console.log('PASS task background aggregation');
