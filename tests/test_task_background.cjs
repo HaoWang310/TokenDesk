@@ -29,6 +29,9 @@ function sendTask(active,model=''){
 (async()=>{
   sendTask(true); await new Promise(r=>setTimeout(r,250));
   assert(lastTaskBody); assert.strictEqual(lastTaskBody.tasks.length,1); assert.strictEqual(lastTaskBody.tasks[0].title,'Long analysis'); assert.strictEqual(lastTaskBody.tasks[0].phase,'thinking');
+  sendTask(true,'请求模型：gpt-6-thinking');
+  await new Promise(r=>setTimeout(r,250));
+  assert.strictEqual(lastTaskBody.tasks[0].model,'请求模型：gpt-6-thinking');
   sendTask(true,'gpt-6-thinking');
   await new Promise(r=>setTimeout(r,250));
   assert.strictEqual(lastTaskBody.tasks[0].model,'gpt-6-thinking');
