@@ -1,4 +1,4 @@
-# TokenDesk for Windows v1.2.6
+# TokenDesk for Windows v1.2.7
 
 Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机桥接协议。
 
@@ -46,6 +46,7 @@ Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机
 
 Windows 端只接收净化后的额度字段与任务元数据（标题、URL、运行阶段、时间）。不会从 Chrome 扩展传输 ChatGPT 对话正文、密码、Cookie 或 bearer token 到 TokenDesk 桌面端。
 
+- v1.2.7 通过 ChatGPT conversation SSE 响应中的 resolved_model_slug 自动识别本次任务模型，例如 gpt-6-thinking。仅发送校验后的模型标识，不传输回答正文；模型可在 Windows / Mac 任务列表和浏览器诊断中显示（Chrome 扩展 v1.8.6）。此来源是非公开网页协议，升级后仍需实际网页验证。
 - v1.2.6 修复 Chrome/Edge 扩展重载后，旧 ChatGPT 标签页向无效扩展上下文发送消息导致的 extract.js:38 错误；消费 runtime.lastError 并终止失效脚本的重复发送。更新扩展至 v1.8.5 后需刷新所有 ChatGPT 标签页。
 - v1.2.5 增加 Chrome/Edge 扩展“检查模型识别”诊断按钮，明确定位网页监听脚本是否加载、选择器是否存在及是否暴露名称；加强新版输入框模型控件识别，适用于 Windows / Mac 的同一扩展 v1.8.4。Work 页面可能不提供模型标签，此时不会猜测底层模型。请同时更新桌面端和扩展并刷新 ChatGPT 网页。
 - v1.2.4 修复新版 ChatGPT 模型识别：支持无 data-testid 的输入框模型/模式按钮（__composer-pill）及 GPT-6 系列名称。仅能读取 Instant、Thinking、Pro 或推理档位时显示“模式”，不推测实际底层模型；关闭选择器时不会因临时重绘将已有识别结果抹掉。需要同时更新 Chrome / Edge 扩展至 v1.8.3，并刷新 ChatGPT 页面。
