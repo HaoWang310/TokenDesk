@@ -342,6 +342,43 @@ async function sendTasksSnapshot() {
   } finally { clearTimeout(timer); }
 }
 
+// Read strictly sanitized model-picker diagnostic status from open ChatGPT
+// tabs. Do not access chat messages or export titles, URLs or account details.
+async function diagnoseOpenModelPickers() {
+  const version = typeof chrome.runtime.getManifest === 'function'
+    ? chrome.runtime.getManifest().version : 'unknown';
+  const tabs = await chrome.tabs.query({
+    url: ['https://chatgpt.com/*', 'https://chat.openai.com/*']
+  });
+  const reports = await Promise.all(tabs.slice(0, 12).map(async (tab, index) => {
+    const entry = { tab: index + 1, status: 'content-script-missing' };
+    if (!Number.isInteger(tab.id)) return entry;
+    try {
+      const result = await chrome.tabs.sendMessage(tab.id, {
+        type: 'TOKEN_DESK_MODEL_DIAGNOSTIC'
+      });
+      if (!result || result.ok !== true) return entry;
+      return {
+        tab: index + 1,
+        status: result.reason || 'unknown',
+        scriptVersion: String(result.scriptVersion || 'old'),
+        activeTask: result.activeTask === true,
+        model: String(result.model || '').slice(0, 64),
+        lastModel: String(result.lastModel || '').slice(0, 64),
+        pickerCount: Math.max(0, Math.min(12, Number(result.pickerCount) || 0)),
+        visiblePickerCount: Math.max(0, Math.min(12, Number(result.visiblePickerCount) || 0)),
+        recognizedPills: Array.isArray(result.recognizedPills)
+          ? result.recognizedPills.filter(v => typeof v === 'string').slice(0, 3).map(s => s.slice(0, 64))
+          : [],
+        taggedAssistantMessages: Math.max(0, Math.min(100, Number(result.taggedAssistantMessages) || 0))
+      };
+    } catch {
+      return entry;
+    }
+  }));
+  return { ok: true, version, tabCount: tabs.length, reports };
+}
+
 function scheduleTaskPublish() {
   if (taskPublishTimer) clearTimeout(taskPublishTimer);
   taskPublishTimer = setTimeout(()=>{ taskPublishTimer=null; sendTasksSnapshot().catch(()=>{}); },120);
@@ -505,6 +542,12 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   }
   if(message?.type==='TOKEN_DESK_BACKGROUND_REFRESH') {
     backgroundQuotaRefresh('manual').then(sendResponse).catch(e=>sendResponse({ok:false,message:String(e)}));
+    return true;
+  }
+  if(message?.type==='TOKEN_DESK_DIAGNOSE_MODELS') {
+    diagnoseOpenModelPickers()
+      .then(sendResponse)
+      .catch(()=>sendResponse({ok:false,message:'模型诊断无法读取已打开的 ChatGPT 标签页。'}));
     return true;
   }
   // Active-use time is reported independently of the running-task detector:
