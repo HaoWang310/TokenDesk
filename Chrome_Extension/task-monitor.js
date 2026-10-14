@@ -132,7 +132,7 @@
       '[data-message-author-role="assistant"][data-message-model-slug]'
     ).length;
     return {
-      ok: true, scriptVersion: '1.8.11',
+      ok: true, scriptVersion: '1.8.12',
       activeTask: active,
       model: model || '',
       lastModel: lastModel || '',
@@ -142,6 +142,7 @@
       conversationFetchSeen,
       streamSeen,
       lastStreamStatus,
+      hookStatus, hookVersion, hookFetchActive,
       pickerCount: pillNodes.length,
       visiblePickerCount: visiblePills.length,
       recognizedPills,
@@ -311,10 +312,36 @@
   let conversationFetchSeen = 0;
   let streamSeen = 0;
   let lastStreamStatus = 'not-observed';
+  let hookStatus = 'not-checked';
+  let hookVersion = '';
+  let hookFetchActive = false;
+  function compatibleModelRoute(raw) {
+    if (!raw || typeof raw !== 'string') return true; // old script compatibility
+    if (raw === location.pathname) return true;
+    // The initial request may originate from the new-chat or project landing
+    // route, before ChatGPT navigates to the new conversation URL.
+    if ((raw === '/' || raw === '') && /^\/c\/[^/]+/.test(location.pathname)) return true;
+    const project = /^\/g\/[^/]+\/?$/.test(raw);
+    if (project && location.pathname.startsWith(raw.replace(/\/$/,'')+'/c/')) return true;
+    return false;
+  }
+  function pingNetworkHook() {
+    try {
+      window.postMessage({channel:'TOKEN_DESK_NETWORK_V1',type:'TOKEN_DESK_HOOK_PING'},
+        location.origin);
+    } catch {}
+  }
   window.addEventListener('message', event => {
     if (event.source !== window || event.origin !== location.origin) return;
     const detail = event.data;
     if (detail?.channel !== 'TOKEN_DESK_NETWORK_V1') return;
+    if (detail.type === 'HOOK_STATUS') {
+      hookStatus = 'connected';
+      hookVersion = typeof detail.hookVersion === 'string' ?
+        detail.hookVersion.slice(0,20) : '';
+      hookFetchActive = detail.fetchWrapped === true;
+      return;
+    }
     if (detail.type === 'MODEL_TRACE') {
       const status = String(detail.status || '');
       const allowed = ['conversation-fetch-seen','stream-observed','not-event-stream',
@@ -326,6 +353,7 @@
       return;
     }
     if (detail.type === 'REQUEST_MODEL') {
+      if (!compatibleModelRoute(detail.route)) return;
       const candidate = detail.model;
       if (detail.source !== 'request_body' || typeof candidate !== 'string' ||
           candidate.length > 64 ||
@@ -339,7 +367,7 @@
       sendState(true);
       return;
     }
-    if (detail.type !== 'MODEL') return;
+    if (detail.type !== 'MODEL' || !compatibleModelRoute(detail.route)) return;
     const candidate = detail.model;
     if (detail.source !== 'resolved_model_slug' || typeof candidate !== 'string' ||
         candidate.length > 64 ||
@@ -418,6 +446,7 @@
 
   function start() {
     if (!document.documentElement) return;
+    pingNetworkHook(); // Replay early response metadata after listener setup.
     observer.observe(document.documentElement, {childList:true,subtree:true,attributes:true,attributeFilter:['aria-label','data-state','data-status','data-testid','disabled']});
     // Count normal ChatGPT browsing and writing, even with no live task.
     setInterval(flushActiveUsage, 10_000);
@@ -445,6 +474,7 @@
 
   chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     if (msg?.type === 'TOKEN_DESK_MODEL_DIAGNOSTIC') {
+      pingNetworkHook();
       sendState(true);
       reply?.(modelDiagnostic());
       return false;
