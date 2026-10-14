@@ -29,6 +29,26 @@ function sendTask(active){
 (async()=>{
   sendTask(true); await new Promise(r=>setTimeout(r,250));
   assert(lastTaskBody); assert.strictEqual(lastTaskBody.tasks.length,1); assert.strictEqual(lastTaskBody.tasks[0].title,'Long analysis'); assert.strictEqual(lastTaskBody.tasks[0].phase,'thinking');
+  // Normal focused ChatGPT time must count even when no task is running.
+  const today=new Date();
+  const day=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
+  let activityResponse=null;
+  const activityRet=receiver({type:'TOKEN_DESK_ACTIVE_USAGE',payload:{
+    usageDay:day,usageSeconds:10
+  }},{url:'https://chatgpt.com/c/test',tab:{id:7}},r=>activityResponse=r);
+  assert.strictEqual(activityRet,false);
+  assert(activityResponse && activityResponse.ok);
+  await new Promise(r=>setTimeout(r,300));
+  const recorded=lastTaskBody.usageDays.find(d=>d.day===day);
+  assert(recorded,'today should be present in the 7-day snapshot');
+  assert.strictEqual(recorded.activeSeconds,10,'10 seconds of independent activity must reach Windows');
+  // A malformed/forged active-usage packet must not be counted.
+  const badRet=receiver({type:'TOKEN_DESK_ACTIVE_USAGE',payload:{
+    usageDay:day,usageSeconds:300
+  }},{url:'https://chatgpt.com/c/test',tab:{id:7}},()=>{});
+  assert.strictEqual(badRet,false);
+  await new Promise(r=>setTimeout(r,250));
+  assert.strictEqual(lastTaskBody.usageDays.find(d=>d.day===day).activeSeconds,10);
   sendTask(false); await new Promise(r=>setTimeout(r,250));
   assert.strictEqual(lastTaskBody.tasks.length,0);
   console.log('PASS task background aggregation');
