@@ -13,6 +13,9 @@ TokenDesk shows quota and running-task status on macOS and Windows:
 - reset times and available resets when reported by ChatGPT
 - recent quota history stored locally on the Mac
 - last-sync and stale-data state
+- daily active ChatGPT usage time
+- seven-day bar charts for active time and weekly-quota consumption
+- current model label beside active Thinking / Working tasks when ChatGPT exposes it in the UI
 
 Current data path:
 
@@ -20,7 +23,7 @@ Current data path:
 
 After the first pairing, Chrome can stay in the background. You do **not** need to keep ChatGPT or the Usage page open.
 
-## Current version: v1.7.7
+## Current version: v1.8.0
 
 Both desktop apps now support quota notifications:
 - 5-hour quota at 20% remaining or below
@@ -28,9 +31,13 @@ Both desktop apps now support quota notifications:
 - 5-hour quota reset
 - weekly quota reset
 
-v1.7.7 uses one architecture-adaptive installer for Intel x86_64 and Apple Silicon arm64, with a macOS 12.0 deployment target and Swift 5.5+ source compatibility.
+v1.8.0 adds local seven-day usage statistics and model labels for active tasks.
 
-v1.7.7 adds macOS 12 Monterey / Intel x86_64 local-build compatibility and fixes Swift closure-capture compilation on older toolchains.
+“Active time” means a ChatGPT tab is in the foreground and has had user interaction within the last five minutes. “Daily usage” is the drop in the weekly remaining quota, measured in percentage points; it is not a token count.
+
+v1.8.0 uses one architecture-adaptive installer for Intel x86_64 and Apple Silicon arm64, with a macOS 12.0 deployment target and Swift 5.5+ source compatibility.
+
+v1.8.0 adds macOS 12 Monterey / Intel x86_64 local-build compatibility and fixes Swift closure-capture compilation on older toolchains.
 
 - Chrome background polling, about every 30 seconds
 - no Codex CLI, Node.js, or npm dependency
@@ -45,7 +52,7 @@ v1.7.7 adds macOS 12 Monterey / Intel x86_64 local-build compatibility and fixes
 - local macOS build/install flow
 - adaptive macOS menu-bar icon
 
-## Windows v1.1.1
+## Windows v1.2.0
 
 The Windows version is under `Windows/` and is built with **.NET 8 + WPF**.
 
@@ -56,7 +63,8 @@ The Windows version is under `Windows/` and is built with **.NET 8 + WPF**.
 - self-contained build: no separate .NET installation required
 - system tray resident app
 - 5-hour / weekly quota, reset times and 7-day local history
-- running-task monitor with separate **Thinking / Working** counts
+- running-task monitor with separate **Thinking / Working** counts and model labels
+- seven-day active-time and daily-quota-consumption bar charts
 - Chrome and Edge can load the bundled Chromium extension
 - loopback bridge remains bound to `127.0.0.1:18743`
 
@@ -154,4 +162,4 @@ ChatGPT usage limits and internal web APIs can change. If the upstream endpoint 
 
 Chinese documentation: [README_中文.md](README_%E4%B8%AD%E6%96%87.md)
 
-- v1.7.7 / Windows v1.1.1: fixes idle ChatGPT Work-mode tabs being falsely reported as active Working tasks.
+- v1.8.0 / Windows v1.2.0: fixes idle ChatGPT Work-mode tabs being falsely reported as active Working tasks.
