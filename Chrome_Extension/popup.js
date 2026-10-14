@@ -77,7 +77,8 @@ document.getElementById('model-check').addEventListener('click', () => {
       if (item.status === 'content-script-missing') {
         lines.push(label + '未收到网页监听脚本，请刷新该 ChatGPT 网页。');
       } else if (item.status === 'recognized') {
-        const origin = item.modelSource === 'resolved_model_slug' ? '网络响应' : '网页界面';
+        const origin = item.modelSource === 'resolved_model_slug' ? '服务器响应' :
+          item.modelSource === 'request_body' ? '发起请求时所选模型（未确认）' : '网页界面';
         lines.push(label + (item.model || item.lastModel || '已检测到模型按钮') +
           '（来源：' + origin + '；监听脚本 ' + item.scriptVersion + '）');
       } else if (item.status === 'picker-absent') {
