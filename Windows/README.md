@@ -1,4 +1,4 @@
-# TokenDesk for Windows v1.2.0
+# TokenDesk for Windows v1.2.1
 
 Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机桥接协议。
 
@@ -46,4 +46,5 @@ Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机
 
 Windows 端只接收净化后的额度字段与任务元数据（标题、URL、运行阶段、时间）。不会从 Chrome 扩展传输 ChatGPT 对话正文、密码、Cookie 或 bearer token 到 TokenDesk 桌面端。
 
+- v1.2.1 修复额度提醒重复弹出：5 小时 / 每周的“额度已刷新”和“剩余 20% 或以下”提醒，在每个真实额度周期内都最多显示一次；关闭后本周期不再重复，下一次真实刷新后重新解锁。
 - v1.2.0 在保留误判修复和额度提醒的基础上，新增 7 天使用统计与模型显示。
