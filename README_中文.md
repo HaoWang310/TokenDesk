@@ -6,7 +6,9 @@ TokenDesk 是面向 macOS 与 Windows 的 ChatGPT Work / Codex 剩余额度与�
 
 **Chrome 后台主动查询 → 本机 TokenDesk → 菜单栏 / 浮窗 / 额度历史**
 
-## Windows v1.0.0
+## Windows v1.1.0
+
+Windows v1.1.0 新增同样的四类额度提醒：5h 20%、周 20%、5h 刷新、周刷新。
 
 Windows 第一版已经加入同一 GitHub 仓库：
 
@@ -22,7 +24,13 @@ Windows 第一版已经加入同一 GitHub 仓库：
 
 Windows 详细说明见 [Windows/README.md](Windows/README.md)。
 
-## macOS v1.7.5 更新
+## macOS v1.7.6 更新
+
+- 5 小时额度剩余 20% 或以下时发送系统提醒；
+- 每周额度剩余 20% 或以下时发送系统提醒；
+- 5 小时额度刷新时发送系统提醒；
+- 每周额度刷新时发送系统提醒；
+- 同一额度周期只提醒一次，避免重复通知；
 
 - 同一套安装包支持 Intel x86_64 与 Apple Silicon arm64；
 - 最低支持 macOS 12 Monterey，兼容 macOS 13 及更新版本；
@@ -69,7 +77,7 @@ Windows 详细说明见 [Windows/README.md](Windows/README.md)。
 1. 解压 ZIP。
 2. 推荐在终端直接运行 `bash "/完整路径/安装到Mac.command"`。不要先单独输入 `bash` 再直接执行 `.command` 文件。
 3. Chrome 打开 `chrome://extensions`。
-4. 找到 **TokenDesk 网页额度同步** → **重新加载**，确认版本为 `1.7.5`。
+4. 找到 **TokenDesk 网页额度同步** → **重新加载**，确认版本为 `1.7.6`。
 5. 原配对码通常继续有效；若显示未配对，从 Mac TokenDesk 设置中重新复制并保存即可。
 6. 点一次扩展里的 **立即后台查询** 验证。
 
