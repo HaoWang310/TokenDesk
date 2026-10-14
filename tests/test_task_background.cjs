@@ -18,10 +18,10 @@ const fetch=async(url,opts={})=>{
   throw new Error('unexpected '+url);
 };
 vm.runInNewContext(code,{chrome,fetch,AbortController,Date,setTimeout,clearTimeout,Response,console});
-function sendTask(active){
+function sendTask(active,model=''){
   let response=null;
   const ret=receiver({type:'TOKEN_DESK_TASK_STATE',payload:{
-    id:'c:test',active,phase:'thinking',title:'Long analysis',pageURL:'https://chatgpt.com/c/test',
+    id:'c:test',active,model,phase:'thinking',title:'Long analysis',pageURL:'https://chatgpt.com/c/test',
     startedAt:Math.floor(Date.now()/1000)-10,lastSeenAt:Math.floor(Date.now()/1000)
   }},{url:'https://chatgpt.com/c/test',tab:{id:7}},r=>response=r);
   assert.strictEqual(ret,false); assert(response && response.ok);
@@ -29,6 +29,14 @@ function sendTask(active){
 (async()=>{
   sendTask(true); await new Promise(r=>setTimeout(r,250));
   assert(lastTaskBody); assert.strictEqual(lastTaskBody.tasks.length,1); assert.strictEqual(lastTaskBody.tasks[0].title,'Long analysis'); assert.strictEqual(lastTaskBody.tasks[0].phase,'thinking');
+  sendTask(true,'gpt-6-thinking');
+  await new Promise(r=>setTimeout(r,250));
+  assert.strictEqual(lastTaskBody.tasks[0].model,'gpt-6-thinking');
+  sendTask(true);
+  await new Promise(r=>setTimeout(r,250));
+  assert.strictEqual(lastTaskBody.tasks[0].model,'gpt-6-thinking',
+    'a later empty UI state must not erase the confirmed model');
+
   // Normal focused ChatGPT time must count even when no task is running.
   const today=new Date();
   const day=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
