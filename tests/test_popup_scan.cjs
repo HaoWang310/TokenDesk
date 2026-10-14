@@ -3,7 +3,8 @@ const handlers={}; let printed='';
 const state={set textContent(v){printed=v;},get textContent(){return printed;}};
 const key={value:''};const last={textContent:''};
 const diagnostic={textContent:'',style:{}};
-const dom={state,key,last,'model-diagnostic':diagnostic,
+const completionNotice={checked:false,addEventListener(e,fn){handlers.completionNotice=fn;}};
+const dom={state,key,last,'model-diagnostic':diagnostic,'completion-notice':completionNotice,
   'model-check':{addEventListener(e,fn){handlers.modelCheck=fn;}},
   save:{addEventListener(e,fn){handlers.save=fn;}},
   health:{addEventListener(e,fn){handlers.health=fn;}},
@@ -21,6 +22,14 @@ const chrome={
 vm.runInNewContext(fs.readFileSync(__dirname+'/../Chrome_Extension/popup.js','utf8'),{
   document:{getElementById:(k)=>dom[k]},chrome, Date, setTimeout:(cb)=>cb()
 });
+assert.strictEqual(completionNotice.checked,true,
+  'Task completion notifications should default to enabled');
+completionNotice.checked=false;
+handlers.completionNotice();
+assert.strictEqual(store.tokendeskTaskCompletionNoticeEnabledV1,false);
+completionNotice.checked=true;
+handlers.completionNotice();
+assert.strictEqual(store.tokendeskTaskCompletionNoticeEnabledV1,true);
 handlers.scan();
 assert(printed.includes('仍登录 ChatGPT'),`Expected background-login instruction, got: ${printed}`);
 backgroundReply={ok:true,message:'后台主动查询成功。无需打开 ChatGPT 页面。'};
