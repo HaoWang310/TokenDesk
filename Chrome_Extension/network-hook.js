@@ -39,6 +39,37 @@
     } catch { return false; }
   }
 
+  function requestModelFromJSON(text) {
+    if (typeof text !== 'string' || text.length > 131072) return null;
+    try {
+      const req = JSON.parse(text);
+      // Request-selected model, NOT proof of the server's resolved model.
+      return validResolvedSlug(req?.model) || validResolvedSlug(req?.model_slug) || null;
+    } catch { return null; }
+  }
+
+  function observeConversationRequest(input, init) {
+    const requestMethod = String(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
+    if (requestMethod !== 'POST') return;
+    const body = init?.body;
+    if (typeof body === 'string') {
+      const found = requestModelFromJSON(body);
+      if (found) emit('REQUEST_MODEL', {model:found,source:'request_body'});
+      return;
+    }
+    // Support fetch(Request) without changing its response or forwarding
+    // any prompt, attachment or header to the desktop app.
+    if (input instanceof Request && body == null &&
+        /application\/json/i.test(input.headers.get('content-type') || '')) {
+      const length = Number(input.headers.get('content-length') || 0);
+      if (length > 131072) return;
+      input.clone().text().then(text => {
+        const found = requestModelFromJSON(text);
+        if (found) emit('REQUEST_MODEL', {model:found,source:'request_body'});
+      }).catch(()=>{});
+    }
+  }
+
   function validResolvedSlug(value) {
     return typeof value === 'string' && value.length <= 64 &&
       /^(?:gpt-[a-z0-9][a-z0-9._-]*|o[1-9][a-z0-9._-]*)$/i.test(value)
@@ -258,6 +289,7 @@
       let url = '';
       try { url = input instanceof Request ? input.url : String(input); } catch {}
       if (isUsageURL(url)) rememberFetchRequest(input, init);
+      if (isConversationURL(url)) observeConversationRequest(input, init);
       const response = await nativeFetch(input, init);
       if (isUsageURL(url)) inspectResponse(response.clone(), url);
       if (isConversationURL(url)) {
@@ -313,5 +345,6 @@
   if (globalThis.__TOKEN_DESK_TEST__) {
     globalThis.__TOKEN_DESK_TEST_PARSE__ = parseUsageJSON;
     globalThis.__TOKEN_DESK_TEST_MODEL_FROM_EVENT__ = resolvedModelFromEvent;
+    globalThis.__TOKEN_DESK_TEST_REQUEST_MODEL__ = requestModelFromJSON;
   }
 })();
