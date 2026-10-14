@@ -12,6 +12,7 @@ public sealed class AppStore
     private readonly string _path;
     private PersistedState _state;
     private List<RunningTaskState> _tasks = new();
+    private List<DailyUsageState> _usageDays = new();
 
     public AppStore()
     {
@@ -45,6 +46,11 @@ public sealed class AppStore
     public IReadOnlyList<RunningTaskState> Tasks
     {
         get { lock (_gate) return _tasks.ToList(); }
+    }
+
+    public IReadOnlyList<DailyUsageState> UsageDays
+    {
+        get { lock (_gate) return _usageDays.ToList(); }
     }
 
     public IReadOnlyList<QuotaAlertEvent> SetQuota(QuotaSnapshotState quota)
@@ -166,14 +172,18 @@ public sealed class AppStore
         return cycle;
     }
 
-    public void SetTasks(IEnumerable<RunningTaskState> tasks)
+    public void SetTaskSnapshot(TaskSnapshotState snapshot)
     {
         lock (_gate)
         {
-            _tasks = tasks
+            _tasks = snapshot.Tasks
                 .Where(t => DateTimeOffset.UtcNow - t.LastSeenAt < TimeSpan.FromSeconds(90))
                 .OrderBy(t => t.StartedAt)
                 .Take(32)
+                .ToList();
+            _usageDays = snapshot.UsageDays
+                .OrderBy(d => d.Day, StringComparer.Ordinal)
+                .TakeLast(7)
                 .ToList();
         }
     }
