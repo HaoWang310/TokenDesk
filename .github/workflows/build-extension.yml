@@ -1,0 +1,40 @@
+name: Verify and package TokenDesk extension
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'Chrome_Extension/**'
+      - 'tests/**'
+      - '.github/workflows/build-extension.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extension:
+    name: extension-only tests and ZIP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for source in Chrome_Extension/*.js; do node --check "$source"; done
+      - name: Run all Chrome extension regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test in tests/*.cjs; do
+            echo "RUN $test"
+            node "$test"
+          done
+      - name: Upload extension only (desktop reinstall not required)
+        uses: actions/upload-artifact@v4
+        with:
+          name: TokenDesk-Chrome-Extension-v1.8.12
+          path: Chrome_Extension/
+          if-no-files-found: error
+          retention-days: 30
