@@ -2,7 +2,7 @@
 const state = document.getElementById('state');
 const key = document.getElementById('key');
 const status = s => { state.textContent = s; };
-const backgroundHint = 'Chrome 保持登录 ChatGPT 即可；无需打开 ChatGPT 页面或“使用情况”页面。';
+const backgroundHint = '额度监控：Chrome 保持登录 ChatGPT 即可，无需打开“使用情况”页面；任务监控需保持对应 ChatGPT 标签页打开。';
 
 function renderLast() {
   chrome.storage.local.get({
@@ -24,7 +24,7 @@ function renderLast() {
 renderLast();
 
 function requestHealth() {
-  status('正在检测 Mac TokenDesk…');
+  status('正在检测 TokenDesk 桌面端…');
   chrome.runtime.sendMessage({type:'TOKEN_DESK_HEALTH'},r=>{
     if(chrome.runtime.lastError) status('浏览器后台未运行，请在 chrome://extensions 中重新加载扩展。');
     else status(r?.message||'连接检查没有返回结果。');
@@ -34,7 +34,7 @@ document.getElementById('health').addEventListener('click',requestHealth);
 
 document.getElementById('save').addEventListener('click',()=>{
   const value=key.value.trim();
-  if(!/^[0-9a-f]{64}$/i.test(value)) {status('配对码必须是从 Mac TokenDesk 复制的完整 64 位字符。');return;}
+  if(!/^[0-9a-f]{64}$/i.test(value)) {status('配对码必须是从 TokenDesk 桌面端复制的完整 64 位字符。');return;}
   chrome.storage.local.set({pairingCode:value,syncStatus:'配对已保存。'+backgroundHint},()=>{
     status('配对已保存。正在尝试后台主动查询…');
     chrome.runtime.sendMessage({type:'TOKEN_DESK_BACKGROUND_REFRESH'},r=>{
