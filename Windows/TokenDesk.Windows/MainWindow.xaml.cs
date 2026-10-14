@@ -89,7 +89,7 @@ public partial class MainWindow : Window
                 PageUrl = task.PageUrl,
                 ModelLabel = string.IsNullOrWhiteSpace(task.ModelName)
                     ? "模型/模式：未识别"
-                    : (task.ModelName.StartsWith("模式：", StringComparison.Ordinal)
+                    : ((task.ModelName.StartsWith("模式：", StringComparison.Ordinal) || task.ModelName.StartsWith("请求模型：", StringComparison.Ordinal))
                         ? task.ModelName
                         : "模型：" + task.ModelName),
                 PhaseLabel = task.Phase == TaskPhase.Unverified ||
