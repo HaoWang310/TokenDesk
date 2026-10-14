@@ -268,6 +268,22 @@ async function sendUsage(payload) {
 
 
 const taskStates = new Map();
+const unverifiedTasks = new Map();
+// Retain the last known task for up to two hours after its page disappears.
+// This is a *pending verification* entry, NEVER a claim of live cloud work.
+const UNVERIFIED_RETENTION_MS = 2 * 60 * 60 * 1000;
+
+function detachTask(tabId) {
+  const task = taskStates.get(tabId);
+  if (!task) return false;
+  taskStates.delete(tabId);
+  unverifiedTasks.set(task.id, {
+    ...task, phase:'unverified', lastSeenAt:Date.now(),
+    verificationExpiresAt:Date.now()+UNVERIFIED_RETENTION_MS
+  });
+  return true;
+}
+
 let taskPublishTimer = null;
 
 function validChatGPTURL(value) {
@@ -289,6 +305,7 @@ function sanitizeTaskMessage(message, sender) {
     tabId: sender.tab.id,
     id: p.id,
     active: p.active,
+    unverified: p.unverified === true,
     phase: p.phase === 'thinking' ? 'thinking' : 'working',
     model,
     usageDay,
@@ -304,9 +321,19 @@ function currentTasks() {
   const now = Date.now();
   const dedup = new Map();
   for (const [tabId, task] of taskStates) {
-    if (!task.active || now - task.lastSeenAt > 90_000) { taskStates.delete(tabId); continue; }
-    const existing = dedup.get(task.id);
-    if (!existing || task.lastSeenAt > existing.lastSeenAt) dedup.set(task.id, task);
+    if (!task.active || now-task.lastSeenAt > 45_000) {
+      detachTask(tabId);
+      continue;
+    }
+    const previous = dedup.get(task.id);
+    if (!previous || task.lastSeenAt > previous.lastSeenAt) dedup.set(task.id, task);
+  }
+  for (const [id, task] of unverifiedTasks) {
+    if (now > task.verificationExpiresAt) {
+      unverifiedTasks.delete(id);
+      continue;
+    }
+    if (!dedup.has(id)) dedup.set(id, task);
   }
   return [...dedup.values()].sort((a,b)=>a.startedAt-b.startedAt).slice(0,20);
 }
@@ -569,8 +596,15 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   if(message?.type==='TOKEN_DESK_TASK_STATE') {
     const task = sanitizeTaskMessage(message, sender);
     if (!task) return false;
-    if (task.active) taskStates.set(task.tabId, task);
-    else taskStates.delete(task.tabId);
+    if (task.active) {
+      taskStates.set(task.tabId, task);
+      unverifiedTasks.delete(task.id);
+    } else if (task.unverified) {
+      detachTask(task.tabId);
+    } else {
+      taskStates.delete(task.tabId);
+      unverifiedTasks.delete(task.id);
+    }
     queueActiveUsage(task.usageDay, task.usageSeconds)
       .finally(() => scheduleTaskPublish());
     sendResponse({ok:true,count:currentTasks().length});
@@ -599,13 +633,13 @@ chrome.runtime.onStartup.addListener(()=>{
 });
 if (chrome.tabs?.onRemoved) {
   chrome.tabs.onRemoved.addListener(tabId=>{
-    if (taskStates.delete(tabId)) scheduleTaskPublish();
+    if (detachTask(tabId)) scheduleTaskPublish();
   });
 }
 if (chrome.tabs?.onUpdated) {
   chrome.tabs.onUpdated.addListener((tabId,changeInfo)=>{
     if (changeInfo.status==='loading' || changeInfo.url) {
-      if (taskStates.delete(tabId)) scheduleTaskPublish();
+      if (detachTask(tabId)) scheduleTaskPublish();
     }
   });
 }
