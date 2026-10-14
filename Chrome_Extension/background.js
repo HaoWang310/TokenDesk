@@ -354,6 +354,28 @@ async function sendUsage(payload) {
 
 
 const taskStates = new Map();
+const observedModels = new Map();
+const MODEL_OBSERVATION_TTL_MS = 2 * 60 * 60 * 1000;
+
+// A conversation's confirmed model can arrive before its run state or before
+// a DOM redraw. Preserve that nonempty observation so subsequent empty UI
+// updates cannot erase a model actually seen in the network response.
+function preserveTaskModel(task) {
+  const now = Date.now();
+  for (const [id, observed] of observedModels) {
+    if (now-observed.at > MODEL_OBSERVATION_TTL_MS) observedModels.delete(id);
+  }
+  if (task.model && /^(?:gpt-[a-z0-9][a-z0-9._-]*|o[1-9][a-z0-9._-]*)$/i.test(task.model)) {
+    observedModels.set(task.id, {model:task.model,at:now});
+  } else if (!task.model) {
+    const observed = observedModels.get(task.id);
+    if (observed && now-observed.at <= MODEL_OBSERVATION_TTL_MS) {
+      task.model = observed.model;
+    }
+  }
+  return task;
+}
+
 const unverifiedTasks = new Map();
 // Retain the last known task for up to two hours after its page disappears.
 // This is a *pending verification* entry, NEVER a claim of live cloud work.
@@ -732,6 +754,7 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   if(message?.type==='TOKEN_DESK_TASK_STATE') {
     const task = sanitizeTaskMessage(message, sender);
     if (!task) return false;
+    preserveTaskModel(task);
     if (task.active) {
       taskStates.set(task.tabId, task);
       if (unverifiedTasks.delete(task.id)) saveUnverifiedTasks();
