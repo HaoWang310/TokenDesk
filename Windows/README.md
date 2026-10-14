@@ -1,4 +1,4 @@
-# TokenDesk for Windows v1.1.1
+# TokenDesk for Windows v1.2.0
 
 Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机桥接协议。
 
@@ -12,6 +12,10 @@ Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机
 - 每周额度刷新提醒；
 - 额度重置时间与 7 天本机历史；
 - 运行任务统计，并区分「思考 / 工作」；
+- 运行任务显示 ChatGPT 页面当前所选模型（页面能够识别时）；
+- 统计每天 ChatGPT 主动使用时间；
+- 显示最近 7 天每日使用时间柱状图；
+- 显示最近 7 天每日每周额度消耗柱状图；
 - 最多统计 20 个活动任务，面板展开前 8 个；
 - 任务完成、停止或失联后自动移除；
 - Chrome / Edge 可加载同一份 Chromium 扩展；
@@ -36,10 +40,10 @@ Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机
 5. 将 TokenDesk 面板中的 64 位配对码复制到浏览器扩展并保存。
 6. Chrome 保持登录 ChatGPT，即可同步额度。
 
-额度监控无需保持 ChatGPT 页面打开；运行任务监控需要对应 ChatGPT 网页标签页保持打开。
+额度监控无需保持 ChatGPT 页面打开；运行任务监控、模型识别和主动使用时间统计需要对应 ChatGPT 网页标签页保持打开。主动使用时间只在 ChatGPT 标签页处于前台且最近 5 分钟内有交互时累计。
 
 ## 隐私
 
 Windows 端只接收净化后的额度字段与任务元数据（标题、URL、运行阶段、时间）。不会从 Chrome 扩展传输 ChatGPT 对话正文、密码、Cookie 或 bearer token 到 TokenDesk 桌面端。
 
-- v1.1.1 修复空闲 ChatGPT Work 模式标签页被误判为“工作”的问题。
+- v1.2.0 在保留误判修复和额度提醒的基础上，新增 7 天使用统计与模型显示。
