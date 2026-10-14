@@ -99,9 +99,12 @@ public partial class MainWindow : Window
                              DateTimeOffset.UtcNow - task.LastSeenAt >= TimeSpan.FromSeconds(45)
                              ? "状态待确认"
                              : task.Phase == TaskPhase.Thinking ? "思考" : "工作",
-                PhaseBrush = task.Phase == TaskPhase.Thinking
-                    ? new SolidColorBrush(WpfColor.FromRgb(154, 181, 255))
-                    : new SolidColorBrush(WpfColor.FromRgb(126, 207, 176)),
+                PhaseBrush = task.Phase == TaskPhase.Unverified ||
+                             DateTimeOffset.UtcNow - task.LastSeenAt >= TimeSpan.FromSeconds(45)
+                    ? new SolidColorBrush(WpfColor.FromRgb(180, 185, 196))
+                    : task.Phase == TaskPhase.Thinking
+                        ? new SolidColorBrush(WpfColor.FromRgb(154, 181, 255))
+                        : new SolidColorBrush(WpfColor.FromRgb(126, 207, 176)),
                 Elapsed = task.Phase == TaskPhase.Unverified ||
                           DateTimeOffset.UtcNow - task.LastSeenAt >= TimeSpan.FromSeconds(45)
                     ? "网页已关闭或失联 · 无法确认云端是否继续运行"
@@ -111,13 +114,15 @@ public partial class MainWindow : Window
 
         var thinking = source.Count(t => t.Phase == TaskPhase.Thinking && DateTimeOffset.UtcNow - t.LastSeenAt < TimeSpan.FromSeconds(45));
         var working = source.Count(t => t.Phase == TaskPhase.Working && DateTimeOffset.UtcNow - t.LastSeenAt < TimeSpan.FromSeconds(45));
-        TaskSummaryText.Text = thinking + working == 0
+        var unverified = source.Count(t => t.Phase == TaskPhase.Unverified ||
+            DateTimeOffset.UtcNow - t.LastSeenAt >= TimeSpan.FromSeconds(45));
+        TaskSummaryText.Text = thinking + working + unverified == 0
             ? "任务 0"
             : string.Join(" · ", new[]
             {
                 thinking > 0 ? $"思考 {thinking}" : "",
                 working > 0 ? $"工作 {working}" : "",
-                source.Count(t => t.Phase == TaskPhase.Unverified || DateTimeOffset.UtcNow - t.LastSeenAt >= TimeSpan.FromSeconds(45)) is var pending && pending > 0 ? $"待确认 {pending}" : ""
+                unverified > 0 ? $"待确认 {unverified}" : ""
             }.Where(x => x.Length > 0));
         NoTasksText.Visibility = source.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
