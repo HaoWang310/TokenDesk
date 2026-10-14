@@ -1,0 +1,64 @@
+name: Build TokenDesk Windows
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'Windows/**'
+      - 'Chrome_Extension/**'
+      - '.github/workflows/build-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.rid }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [win-x64, win-arm64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish
+        shell: pwsh
+        run: |
+          $rid = '${{ matrix.rid }}'
+          $out = Join-Path $PWD "dist\$rid"
+          dotnet publish "Windows\TokenDesk.Windows\TokenDesk.Windows.csproj" `
+            -c Release `
+            -r $rid `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:DebugType=None `
+            -p:DebugSymbols=false `
+            -o $out
+          Copy-Item "Chrome_Extension" (Join-Path $out "Chrome_Extension") -Recurse -Force
+          Copy-Item "Windows\README.md" (Join-Path $out "README_Windows.md") -Force
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $rid = '${{ matrix.rid }}'
+          $source = Join-Path $PWD "dist\$rid\*"
+          $zip = Join-Path $PWD "TokenDesk-Windows-$rid.zip"
+          Compress-Archive -Path $source -DestinationPath $zip -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TokenDesk-Windows-${{ matrix.rid }}
+          path: TokenDesk-Windows-${{ matrix.rid }}.zip
+          if-no-files-found: error
+          retention-days: 30
