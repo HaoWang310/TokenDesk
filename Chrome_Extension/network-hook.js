@@ -155,11 +155,14 @@
     let found = null;
     let status = 'stream-ended';
     emit('MODEL_TRACE', {status:'stream-observed'});
-    // Limit total bytes and observation time. Never buffer a complete
-    // conversation or delay the app's original Response consumer.
+    // The stream stays open while ChatGPT is generating. Model metadata may
+    // appear early; continue draining the clone after identifying it, without
+    // buffering or inspecting response text, to track the true task lifetime.
+    // Limit observation to 2 hours to avoid pinning a stuck clone forever.
+    emit('TASK_STREAM', {status:'open',route});
     let timedOut = false;
     const timeoutId = typeof setTimeout === 'function'
-      ? setTimeout(() => { timedOut=true; status='timeout'; reader.cancel().catch(()=>{}); }, 180000) : null;
+      ? setTimeout(() => { timedOut=true; status='timeout'; reader.cancel().catch(()=>{}); }, 7200000) : null;
 
     function processEvent() {
       if (!dataLines.length) return null;
@@ -171,13 +174,20 @@
     }
 
     try {
-      while (!found && !timedOut && scannedBytes < 2097152) {
+      while (!timedOut) {
         const {value,done} = await reader.read();
         if (done) break;
+        // Once a model is found, or the bounded model inspection budget has
+        // been spent, discard subsequent chunks. Only stream completion matters.
+        if (found || scannedBytes >= 2097152) continue;
         scannedBytes += value.byteLength;
         buffer += decoder.decode(value, {stream:true});
-        // A single giant SSE line can contain answer text. Never hold it.
-        if (buffer.length > 65536) break;
+        if (buffer.length > 65536) {
+          buffer = '';
+          dataLines = [];
+          scannedBytes = 2097152;
+          continue;
+        }
         let index;
         while ((index=buffer.indexOf('\n')) !== -1) {
           let line = buffer.slice(0,index);
@@ -185,7 +195,11 @@
           buffer=buffer.slice(index+1);
           if (!line) {
             found = processEvent();
-            if (found) break;
+            if (found) {
+              publishModel('MODEL',found,'resolved_model_slug',route);
+              buffer=''; dataLines=[];
+              break;
+            }
           } else if (line.startsWith('data:')) {
             const data = line.slice(5).trimStart();
             if (dataLines.join('').length + data.length < 50000) dataLines.push(data);
@@ -201,15 +215,16 @@
         }
       }
       if (!found) found=processEvent();
-      if (found) {
-        publishModel('MODEL',found,'resolved_model_slug',route);
-      } else {
+      if (!found) {
         if (scannedBytes >= 2097152) status='byte-limit';
         emit('MODEL_TRACE', {status});
       }
-    } catch {} finally {
+    } catch {
+      status='stream-error';
+    } finally {
       if (timeoutId !== null) clearTimeout(timeoutId);
       try { await reader.cancel(); } catch {}
+      emit('TASK_STREAM', {status: status === 'stream-ended' ? 'closed' : 'uncertain',route});
     }
   }
 
