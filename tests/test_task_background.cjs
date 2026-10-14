@@ -70,6 +70,23 @@ function sendTask(active){
   const afterAdjacent=lastTaskBody.usageDays.find(d=>d.day===day).activeSeconds;
   assert(afterAdjacent>=29 && afterAdjacent<=31,
     'a nonoverlapping 10s task interval must add 10s to the daily total');
+  // After migration, old-format heartbeats from an unrefreshed tab must not
+  // add another ten seconds on top of already timestamped session coverage.
+  assert(storage.tokenDeskSessionMigrationV1 &&
+    Number.isFinite(storage.tokenDeskSessionMigrationV1.at));
+  receiver({type:'TOKEN_DESK_ACTIVE_USAGE',
+    payload:{usageDay:day,usageSeconds:10}
+  },{url:'https://chatgpt.com/c/test',tab:{id:7}},()=>{});
+  await new Promise(r=>setTimeout(r,300));
+  const afterLegacyHeartbeat=lastTaskBody.usageDays.find(d=>d.day===day).activeSeconds;
+  assert(afterLegacyHeartbeat>=29 && afterLegacyHeartbeat<=31,
+    'legacy messages after migration must not double-count time');
+  // Replaying exactly the same interval on another tab cannot add time.
+  sendInterval(9,startAt,endAt,'task');
+  await new Promise(r=>setTimeout(r,300));
+  assert.strictEqual(lastTaskBody.usageDays.find(d=>d.day===day).activeSeconds,
+    afterLegacyHeartbeat,'duplicate time intervals are idempotent');
+
 
   let diagnostics=null;
   const ret=receiver({type:'TOKEN_DESK_DIAGNOSE_MODELS'},{},r=>diagnostics=r);
