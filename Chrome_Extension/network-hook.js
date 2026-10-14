@@ -10,7 +10,7 @@
   let requestTemplate = null;
   let lastPayload = null;
   let refreshBusy = false;
-  const HOOK_VERSION = '1.8.12';
+  const HOOK_VERSION = '1.8.13';
   let lastModelSignal = null;
   let fetchWrapper = null;
   const MAX_REPLAY_AGE_MS = 5 * 60 * 1000;
