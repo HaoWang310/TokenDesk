@@ -484,7 +484,7 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
     const p = message.payload || {};
     const dayKey = typeof p.usageDay === 'string' ? p.usageDay : '';
     const seconds = p.usageSeconds;
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dayKey) ||
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey) ||
         !Number.isInteger(seconds) || seconds < 1 || seconds > 30) return false;
     queueActiveUsage(dayKey, seconds).finally(() => scheduleTaskPublish());
     sendResponse({ok:true});
