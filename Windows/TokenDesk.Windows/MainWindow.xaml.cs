@@ -167,7 +167,7 @@ public partial class MainWindow : Window
             if (value == null) continue;
             var x = Math.Clamp((point.Timestamp - start).TotalSeconds / duration, 0, 1) * width;
             var y = (1 - Math.Clamp(value.Value / 100.0, 0, 1)) * height;
-            series.Points.Add(new Point(x, y));
+            series.Points.Add(new System.Windows.Point(x, y));
         }
         if (series.Points.Count > 0) HistoryCanvas.Children.Add(series);
     }
@@ -195,7 +195,7 @@ public partial class MainWindow : Window
 
     private void TaskOpen_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button button && button.Tag is string url && Uri.TryCreate(url, UriKind.Absolute, out _))
+        if (sender is System.Windows.Controls.Button button && button.Tag is string url && Uri.TryCreate(url, UriKind.Absolute, out _))
         {
             try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
         }
@@ -203,8 +203,8 @@ public partial class MainWindow : Window
 
     private void OpenExtensionFolder_Click(object sender, RoutedEventArgs e)
     {
-        var folder = Path.Combine(AppContext.BaseDirectory, "Chrome_Extension");
-        if (!Directory.Exists(folder))
+        var folder = System.IO.Path.Combine(AppContext.BaseDirectory, "Chrome_Extension");
+        if (!System.IO.Directory.Exists(folder))
         {
             System.Windows.MessageBox.Show("当前程序目录中没有 Chrome_Extension 文件夹。请使用 GitHub Actions 发布包。", "TokenDesk");
             return;
