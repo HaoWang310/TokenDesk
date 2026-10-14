@@ -64,6 +64,22 @@
         const patchModel = validResolvedSlug(node.v ?? node.value);
         if (patchModel) return patchModel;
       }
+      // A metadata object may itself be JSON-encoded in patch.value rather
+      // than supplied as a nested object. Restrict decoding to metadata paths
+      // and never inspect textual content from a conversation.
+      const metadataPatch = patchPath === 'metadata' ||
+        patchPath.endsWith('/metadata') || patchPath === '/message';
+      if (metadataPatch) {
+        const value = node.v ?? node.value;
+        if (typeof value === 'string' && value.length < 8192 && value[0] === '{') {
+          try {
+            const parsed = JSON.parse(value);
+            const metadata = parsed?.metadata || parsed?.message?.metadata || parsed;
+            const slug = validResolvedSlug(metadata?.resolved_model_slug);
+            if (slug) return slug;
+          } catch {}
+        }
+      }
       // Keep only metadata-bearing tree paths. Do not inspect user/assistant
       // content, tool arguments, attachment data or message text.
       for (const [key, value] of Object.entries(node)) {
