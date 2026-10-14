@@ -86,6 +86,19 @@
     return seconds;
   }
 
+  // Send focused, recently interactive use time on its own heartbeat.
+  // This must not depend on whether the UI currently exposes a running task.
+  // The background worker persists the seconds before updating Windows/macOS.
+  function flushActiveUsage() {
+    const now = Date.now();
+    const seconds = takeActiveUsageSeconds(now);
+    if (seconds <= 0) return;
+    chrome.runtime.sendMessage({
+      type: 'TOKEN_DESK_ACTIVE_USAGE',
+      payload: { usageDay: localDayKey(new Date(now)), usageSeconds: seconds }
+    }).catch(() => {});
+  }
+
   function visible(el) {
     if (!el || !el.isConnected) return false;
     const style = getComputedStyle(el);
@@ -175,7 +188,7 @@
     const nextPhase = activePhase();
     const next = nextPhase !== null;
     const model = currentModelLabel();
-    const usageSeconds = takeActiveUsageSeconds(now);
+    const usageSeconds = 0; // Activity is sent by flushActiveUsage, not task updates.
     if (next && !active) startedAt = now;
     if (!next) startedAt = null;
     const changed = next !== active || nextPhase !== phase || model !== lastModel;
@@ -210,6 +223,8 @@
   function start() {
     if (!document.documentElement) return;
     observer.observe(document.documentElement, {childList:true,subtree:true,attributes:true,attributeFilter:['aria-label','data-state','data-status','data-testid','disabled']});
+    // Count normal ChatGPT browsing and writing, even with no live task.
+    setInterval(flushActiveUsage, 10_000);
     for (const type of ['pointerdown','keydown','wheel','scroll','touchstart']) {
       addEventListener(type, noteInteraction, {passive:true, capture:true});
     }
@@ -229,8 +244,9 @@
   });
 
   addEventListener('pagehide', () => {
+    flushActiveUsage();
     const now = Date.now();
-    const usageSeconds = takeActiveUsageSeconds(now);
+    const usageSeconds = 0;
     const wasActive = active;
     active = false;
     chrome.runtime.sendMessage({
