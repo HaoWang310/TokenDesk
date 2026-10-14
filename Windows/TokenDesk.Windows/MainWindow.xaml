@@ -74,8 +74,8 @@
             <Border Background="#1A1E25" CornerRadius="15" Padding="14" Margin="0,0,0,12">
                 <StackPanel>
                     <DockPanel Margin="0,0,0,8">
-                        <TextBlock Text="近 7 天使用统计" FontSize="12" FontWeight="SemiBold"/>
-                        <TextBlock Text="Chrome 本机记录" DockPanel.Dock="Right" Foreground="#7F8898" FontSize="9.5"/>
+                        <TextBlock Text="本周使用统计（周一至周日）" FontSize="12" FontWeight="SemiBold"/>
+                        <TextBlock Text="每周一 00:00 清零" DockPanel.Dock="Right" Foreground="#7F8898" FontSize="9.5"/>
                     </DockPanel>
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
@@ -91,7 +91,7 @@
                         </Border>
                         <Border Grid.Column="2" Background="#151920" CornerRadius="10" Padding="10">
                             <StackPanel>
-                                <TextBlock Text="7 天累计" Foreground="#7F8898" FontSize="9.5"/>
+                                <TextBlock Text="本周累计" Foreground="#7F8898" FontSize="9.5"/>
                                 <TextBlock x:Name="WeekActiveText" Text="0分" FontSize="18" FontWeight="SemiBold" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Border>
@@ -104,7 +104,7 @@
                     <Canvas x:Name="QuotaUsageCanvas" Height="116" Margin="0,6,0,8" SizeChanged="WeeklyCanvas_SizeChanged"/>
 
                     <TextBlock x:Name="WeekQuotaTotalText"
-                               Text="7 天用量累计：0%。使用时间仅统计 ChatGPT 标签页前台且最近 5 分钟有交互的时间；用量不是 Token 数。"
+                               Text="本周用量累计：0 个百分点。每周一自动清零；安装前数据不能补录，统计不影响 ChatGPT 官方额度。"
                                TextWrapping="Wrap" Foreground="#70798A" FontSize="9.2"/>
                 </StackPanel>
             </Border>
@@ -168,7 +168,7 @@
                 </StackPanel>
             </Border>
 
-            <TextBlock Text="TokenDesk Windows v1.2.2 · 本机仅监听 127.0.0.1:18743"
+            <TextBlock Text="TokenDesk Windows v1.2.3 · 本机仅监听 127.0.0.1:18743"
                        HorizontalAlignment="Center" Foreground="#555E6E" FontSize="9" Margin="0,14,0,2"/>
         </StackPanel>
     </ScrollViewer>
