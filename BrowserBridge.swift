@@ -5,6 +5,7 @@ struct RunningChatTask: Equatable, Identifiable {
     enum Phase: String {
         case thinking
         case working
+        case unverified
     }
 
     let id: String
@@ -50,7 +51,8 @@ struct RunningTaskSnapshot {
             }
             let title = titleRaw.trimmingCharacters(in: .whitespacesAndNewlines)
             let phaseRaw = (raw["phase"] as? String)?.lowercased() ?? "working"
-            let phase: RunningChatTask.Phase = phaseRaw == "thinking" ? .thinking : .working
+            let phase: RunningChatTask.Phase = phaseRaw == "unverified" ? .unverified :
+                (phaseRaw == "thinking" ? .thinking : .working)
             let modelRaw = ((raw["model"] as? String) ?? "")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let modelName = modelRaw.isEmpty ? nil : String(modelRaw.prefix(64))
