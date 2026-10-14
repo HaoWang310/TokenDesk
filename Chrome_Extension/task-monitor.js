@@ -339,10 +339,14 @@
       // ChatGPT can begin a new conversation on / and navigate to /c/<id>
       // only AFTER the SSE model metadata has arrived. Keep that fresh
       // confirmed model through this one-time creation redirect.
-      const formerIsNewChat = modelRoute === '/' || modelRoute === '';
-      const newChatCreated = /^\/c\/[^/]+/.test(location.pathname);
+      const rootToChat = (modelRoute === '/' || modelRoute === '') &&
+        /^\/c\/[^/]+/.test(location.pathname);
+      const projectLanding = /^\/g\/[^/]+\/?$/.test(modelRoute);
+      const projectRoot = modelRoute.replace(/\/$/, '');
+      const projectToChat = projectLanding &&
+        location.pathname.startsWith(projectRoot + '/c/');
       const freshStream = resolvedModel && Date.now() - resolvedModelReceivedAt < 90_000;
-      if (!(formerIsNewChat && newChatCreated && freshStream)) {
+      if (!(freshStream && (rootToChat || projectToChat))) {
         resolvedModel = null;
         resolvedModelReceivedAt = 0;
         lastModel = null;
