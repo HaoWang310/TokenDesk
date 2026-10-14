@@ -63,9 +63,15 @@ function sendTask(active){
   await new Promise(r=>setTimeout(r,250));
   assert.strictEqual(lastTaskBody.tasks.length,1);
   assert.strictEqual(lastTaskBody.tasks[0].phase,'unverified');
+  assert(Array.isArray(storage.tokenDeskUnverifiedTasks_v1) &&
+    storage.tokenDeskUnverifiedTasks_v1.some(t => t.id==='c:test'),
+    'pending work must survive a Chrome service-worker restart');
   assert.strictEqual(lastTaskBody.tasks[0].title,'Long analysis');
   // Reopening the conversation and observing completion removes it.
   sendTask(false); await new Promise(r=>setTimeout(r,250));
   assert.strictEqual(lastTaskBody.tasks.length,0);
+  assert(Array.isArray(storage.tokenDeskUnverifiedTasks_v1) &&
+    storage.tokenDeskUnverifiedTasks_v1.length===0,
+    'verified completion must remove persisted pending work');
   console.log('PASS task background aggregation');
 })().catch(e=>{console.error(e);process.exit(1)});
