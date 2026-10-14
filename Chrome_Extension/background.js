@@ -22,6 +22,7 @@ const pick = (obj, ...names) => {
 const clampPct = n => Math.max(0, Math.min(100, Math.round(n)));
 
 const ACTIVE_USAGE_KEY = 'tokendeskDailyActiveUsageV1';
+const SESSION_INTERVAL_KEY = 'tokendeskSessionIntervalsV1';
 const WEEKLY_USAGE_KEY = 'tokendeskDailyWeeklyQuotaUsedV1';
 const WEEKLY_BASELINE_KEY = 'tokendeskWeeklyQuotaBaselineV1';
 let statsWriteChain = Promise.resolve();
@@ -62,6 +63,54 @@ function pruneDayMap(input, now = new Date()) {
     if (Number.isFinite(value) && value >= 0) out[key] = value;
   }
   return out;
+}
+
+// New active-session tracker: union of intervals for foreground engagement
+// and verified background model work. It is monotonic and deduplicated across
+// multiple ChatGPT tabs. Legacy foreground readings remain as historical
+// baseline so upgrading never erases already collected usage.
+function pruneSessionIntervals(input, now = new Date()) {
+  const allowed = new Set(currentWeekDayKeys(now));
+  const result = {};
+  for (const [day, ranges] of Object.entries(input || {})) {
+    if (!allowed.has(day) || day > localDayKey(now) || !Array.isArray(ranges)) continue;
+    result[day] = ranges.filter(r => Array.isArray(r) && r.length === 2 &&
+      Number.isFinite(r[0]) && Number.isFinite(r[1]) && r[1] > r[0]);
+  }
+  return result;
+}
+
+function mergeUsageRange(ranges, start, end) {
+  const sorted = [...ranges, [start,end]].sort((a,b)=>a[0]-b[0]);
+  const merged = [];
+  for (const interval of sorted) {
+    const last = merged[merged.length-1];
+    if (last && last[1] >= interval[0]) {
+      last[1] = Math.max(last[1],interval[1]);
+    } else merged.push([...interval]);
+  }
+  return merged;
+}
+
+function queueSessionInterval(startAt, endAt) {
+  statsWriteChain = statsWriteChain.then(async () => {
+    const stored = await chrome.storage.local.get({[SESSION_INTERVAL_KEY]:{}});
+    const map = pruneSessionIntervals(stored[SESSION_INTERVAL_KEY]);
+    let start = startAt;
+    const currentWeek = new Set(currentWeekDayKeys());
+    while (start < endAt) {
+      const date = new Date(start);
+      const nextMidnight = new Date(date.getFullYear(),date.getMonth(),date.getDate()+1).getTime();
+      const end = Math.min(endAt,nextMidnight);
+      const day = localDayKey(date);
+      if (currentWeek.has(day) && day <= localDayKey()) {
+        map[day] = mergeUsageRange(map[day] || [],start,end);
+      }
+      start = end;
+    }
+    await chrome.storage.local.set({[SESSION_INTERVAL_KEY]:pruneSessionIntervals(map)});
+  }).catch(()=>{});
+  return statsWriteChain;
 }
 
 function queueActiveUsage(dayKey, seconds) {
@@ -124,11 +173,13 @@ async function usageDaysSnapshot() {
     statsWriteChain = statsWriteChain.then(async () => {
       const old = await chrome.storage.local.get({
         [ACTIVE_USAGE_KEY]:{},
-        [WEEKLY_USAGE_KEY]:{}
+        [WEEKLY_USAGE_KEY]:{},
+        [SESSION_INTERVAL_KEY]:{}
       });
       await chrome.storage.local.set({
         [ACTIVE_USAGE_KEY]:pruneDayMap(old[ACTIVE_USAGE_KEY]),
-        [WEEKLY_USAGE_KEY]:pruneDayMap(old[WEEKLY_USAGE_KEY])
+        [WEEKLY_USAGE_KEY]:pruneDayMap(old[WEEKLY_USAGE_KEY]),
+        [SESSION_INTERVAL_KEY]:pruneSessionIntervals(old[SESSION_INTERVAL_KEY])
       });
     }).catch(() => {});
     lastPrunedWeek = week;
@@ -137,13 +188,18 @@ async function usageDaysSnapshot() {
   await statsWriteChain.catch(() => {});
   const stored = await chrome.storage.local.get({
     [ACTIVE_USAGE_KEY]:{},
-    [WEEKLY_USAGE_KEY]:{}
+    [WEEKLY_USAGE_KEY]:{},
+    [SESSION_INTERVAL_KEY]:{}
   });
   const active = pruneDayMap(stored[ACTIVE_USAGE_KEY]);
   const quota = pruneDayMap(stored[WEEKLY_USAGE_KEY]);
+  const intervals = pruneSessionIntervals(stored[SESSION_INTERVAL_KEY]);
   return currentWeekDayKeys().map(day => ({
     day,
-    activeSeconds: Math.max(0, Math.min(86_400, Math.round(active[day] || 0))),
+    activeSeconds: Math.max(0, Math.min(86_400, Math.round(
+      (active[day] || 0) + (intervals[day] || [])
+        .reduce((seconds, r) => seconds + (r[1]-r[0])/1000, 0)
+    ))),
     weeklyQuotaUsed: Math.max(0, Math.min(500, Math.round(quota[day] || 0)))
   }));
 }
@@ -619,6 +675,19 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   // Active-use time is reported independently of the running-task detector:
   // an ordinary focused ChatGPT conversation should count even when no
   // Thinking / Working task is active.
+  if(message?.type==='TOKEN_DESK_SESSION_INTERVAL') {
+    if (!Number.isInteger(sender?.tab?.id) || !validChatGPTURL(sender?.url || '')) return false;
+    const p = message.payload || {};
+    const startAt = Number(p.startAt), endAt = Number(p.endAt);
+    const now = Date.now();
+    if (!Number.isInteger(startAt) || !Number.isInteger(endAt) ||
+        endAt <= startAt || endAt-startAt > 60_000 ||
+        startAt < now-90_000 || endAt > now+5000 ||
+        !['foreground','task'].includes(p.reason)) return false;
+    queueSessionInterval(startAt,endAt).finally(() => scheduleTaskPublish());
+    sendResponse({ok:true});
+    return false;
+  }
   if(message?.type==='TOKEN_DESK_ACTIVE_USAGE') {
     if (!Number.isInteger(sender?.tab?.id) || !validChatGPTURL(sender?.url || '')) return false;
     const p = message.payload || {};
@@ -696,4 +765,5 @@ refreshTaskTabs(true).catch(()=>{});
 if (globalThis.__TOKEN_DESK_TEST__) {
   globalThis.__TOKEN_DESK_TEST_PARSE__ = parseUsageJSON;
   globalThis.__TOKEN_DESK_TEST_WEEK__ = { currentWeekDayKeys, weekStartKey, pruneDayMap };
+  globalThis.__TOKEN_DESK_TEST_SESSION__ = {pruneSessionIntervals,mergeUsageRange,queueSessionInterval,usageDaysSnapshot};
 }
