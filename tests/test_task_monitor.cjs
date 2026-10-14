@@ -166,6 +166,7 @@ assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).p
 sandbox.__TOKEN_DESK_TASK_TEST_SEND__(true);
 assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.active,true,
   'transiently missing Stop/status UI must not end an open SSE task');
+assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.completionVerified,false);
 // An old conversation's stream cannot hold the current chat open.
 windowListeners.message({source:pageWindow,origin:'https://chatgpt.com',
   data:{channel:'TOKEN_DESK_NETWORK_V1',type:'TASK_STREAM',status:'closed',route:'/c/wrong'}});
@@ -175,6 +176,11 @@ windowListeners.message({source:pageWindow,origin:'https://chatgpt.com',
   data:{channel:'TOKEN_DESK_NETWORK_V1',type:'TASK_STREAM',status:'closed',route:'/c/another'}});
 assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.active,false,
   'a completed stream must remove the task');
+assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.completionVerified,true,
+  'only normal SSE completion after an active run is eligible for a notice');
+sandbox.__TOKEN_DESK_TASK_TEST_SEND__(true);
+assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.completionVerified,false,
+  'idle heartbeats must not repeatedly claim completion');
 // Live progress outside a message, but under <main>, can show Thinking.
 const liveThinking=fakeNode('正在思考');
 liveThinking.closest=()=>null;
