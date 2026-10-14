@@ -66,7 +66,7 @@ public partial class App : System.Windows.Application
         menu.Items.Add("打开 TokenDesk", null, (_, _) => ShowWindow());
         menu.Items.Add("复制配对码", null, (_, _) =>
         {
-            if (_store != null) Clipboard.SetText(_store.PairingCode);
+            if (_store != null) System.Windows.Clipboard.SetText(_store.PairingCode);
         });
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("退出", null, (_, _) => ExitApplication());
