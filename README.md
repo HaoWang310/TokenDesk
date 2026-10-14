@@ -20,11 +20,17 @@ Current data path:
 
 After the first pairing, Chrome can stay in the background. You do **not** need to keep ChatGPT or the Usage page open.
 
-## Current version: v1.7.5
+## Current version: v1.7.6
 
-v1.7.5 uses one architecture-adaptive installer for Intel x86_64 and Apple Silicon arm64, with a macOS 12.0 deployment target and Swift 5.5+ source compatibility.
+Both desktop apps now support quota notifications:
+- 5-hour quota at 20% remaining or below
+- weekly quota at 20% remaining or below
+- 5-hour quota reset
+- weekly quota reset
 
-v1.7.5 adds macOS 12 Monterey / Intel x86_64 local-build compatibility and fixes Swift closure-capture compilation on older toolchains.
+v1.7.6 uses one architecture-adaptive installer for Intel x86_64 and Apple Silicon arm64, with a macOS 12.0 deployment target and Swift 5.5+ source compatibility.
+
+v1.7.6 adds macOS 12 Monterey / Intel x86_64 local-build compatibility and fixes Swift closure-capture compilation on older toolchains.
 
 - Chrome background polling, about every 30 seconds
 - no Codex CLI, Node.js, or npm dependency
@@ -39,7 +45,7 @@ v1.7.5 adds macOS 12 Monterey / Intel x86_64 local-build compatibility and fixes
 - local macOS build/install flow
 - adaptive macOS menu-bar icon
 
-## Windows v1.0.0
+## Windows v1.1.0
 
 The Windows version is under `Windows/` and is built with **.NET 8 + WPF**.
 
