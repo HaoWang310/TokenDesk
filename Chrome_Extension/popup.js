@@ -92,7 +92,7 @@ document.getElementById('model-check').addEventListener('click', () => {
       }
     }
     lines.push('如果仍显示未识别，请把此诊断结果截图发来；诊断不包含聊天正文。');
-    panel.textContent = lines.join('\\n');
+    panel.textContent = lines.join('\n');
     panel.style.whiteSpace = 'pre-line';
   });
 });
