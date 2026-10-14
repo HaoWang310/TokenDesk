@@ -153,6 +153,37 @@ assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).p
 
 
 
+// A 20-minute Thinking task can temporarily lose its visible Stop control
+// while React renders long output. Its same-chat SSE must keep it alive.
+sandbox.location.pathname='/c/another';
+sandbox.location.href='https://chatgpt.com/c/another';
+sandbox.document.querySelectorAll=()=>[];
+windowListeners.message({source:pageWindow,origin:'https://chatgpt.com',
+  data:{channel:'TOKEN_DESK_NETWORK_V1',type:'TASK_STREAM',status:'open',route:'/c/another'}});
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTIVE_PHASE__(),'working');
+assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.active,true);
+sandbox.__TOKEN_DESK_TASK_TEST_SEND__(true);
+assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.active,true,
+  'transiently missing Stop/status UI must not end an open SSE task');
+// An old conversation's stream cannot hold the current chat open.
+windowListeners.message({source:pageWindow,origin:'https://chatgpt.com',
+  data:{channel:'TOKEN_DESK_NETWORK_V1',type:'TASK_STREAM',status:'closed',route:'/c/wrong'}});
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTIVE_PHASE__(),'working');
+// Positive stream completion, with no UI evidence, ends the task.
+windowListeners.message({source:pageWindow,origin:'https://chatgpt.com',
+  data:{channel:'TOKEN_DESK_NETWORK_V1',type:'TASK_STREAM',status:'closed',route:'/c/another'}});
+assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.active,false,
+  'a completed stream must remove the task');
+// Live progress outside a message, but under <main>, can show Thinking.
+const liveThinking=fakeNode('正在思考');
+liveThinking.closest=()=>null;
+sandbox.document.querySelectorAll=selector =>
+  selector==='main [role="status"],main [aria-live="polite"],main [aria-live="assertive"]'
+    ? [liveThinking] : [];
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTIVE_PHASE__(),'thinking');
+sandbox.document.querySelectorAll=()=>[];
+sandbox.__TOKEN_DESK_TASK_TEST_SEND__(true);
+
 // Total ChatGPT usage includes focused browsing and confirmed hidden work,
 // but excludes an idle hidden tab. Timing is reported as wall-clock intervals.
 sandbox.document.visibilityState='visible';
