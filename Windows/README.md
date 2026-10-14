@@ -1,4 +1,4 @@
-# TokenDesk for Windows v1.0.0
+# TokenDesk for Windows v1.1.0
 
 Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机桥接协议。
 
@@ -6,6 +6,10 @@ Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机
 
 - Windows 系统托盘常驻；
 - ChatGPT 5 小时 / 每周剩余额度；
+- 5 小时剩余 20% 或以下提醒；
+- 每周剩余 20% 或以下提醒；
+- 5 小时额度刷新提醒；
+- 每周额度刷新提醒；
 - 额度重置时间与 7 天本机历史；
 - 运行任务统计，并区分「思考 / 工作」；
 - 最多统计 20 个活动任务，面板展开前 8 个；
