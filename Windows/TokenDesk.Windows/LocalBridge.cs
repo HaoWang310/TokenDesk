@@ -13,7 +13,7 @@ public sealed class LocalBridge : IDisposable
     private TcpListener? _listener;
 
     public event Action<QuotaSnapshotState>? QuotaReceived;
-    public event Action<IReadOnlyList<RunningTaskState>>? TasksReceived;
+    public event Action<TaskSnapshotState>? TasksReceived;
     public event Action<string>? StateChanged;
 
     public LocalBridge(string pairingCode)
@@ -179,7 +179,7 @@ public sealed class LocalBridge : IDisposable
         }
     }
 
-    private static IReadOnlyList<RunningTaskState>? ParseTasks(byte[] body)
+    private static TaskSnapshotState? ParseTasks(byte[] body)
     {
         try
         {
@@ -205,11 +205,36 @@ public sealed class LocalBridge : IDisposable
                     Phase = phase,
                     Title = string.IsNullOrWhiteSpace(title) ? "ChatGPT 任务" : title.Trim()[..Math.Min(title.Trim().Length, 100)],
                     PageUrl = url,
+                    ModelName = GetString(item, "model").Trim()[..Math.Min(GetString(item, "model").Trim().Length, 64)],
                     StartedAt = GetUnixSeconds(item, "startedAt") ?? now,
                     LastSeenAt = GetUnixSeconds(item, "lastSeenAt") ?? now
                 });
             }
-            return result.OrderBy(t => t.StartedAt).ToList();
+            var usageDays = new List<DailyUsageState>();
+            if (root.TryGetProperty("usageDays", out var usageEl) && usageEl.ValueKind == JsonValueKind.Array &&
+                usageEl.GetArrayLength() <= 8)
+            {
+                foreach (var dayEl in usageEl.EnumerateArray())
+                {
+                    var day = GetString(dayEl, "day");
+                    if (day.Length != 10 || day[4] != '-' || day[7] != '-') continue;
+                    var active = GetInt(dayEl, "activeSeconds", 0, 86_400);
+                    var quota = GetInt(dayEl, "weeklyQuotaUsed", 0, 500);
+                    if (active == null || quota == null) continue;
+                    usageDays.Add(new DailyUsageState
+                    {
+                        Day = day,
+                        ActiveSeconds = active.Value,
+                        WeeklyQuotaUsed = quota.Value
+                    });
+                }
+            }
+
+            return new TaskSnapshotState
+            {
+                Tasks = result.OrderBy(t => t.StartedAt).ToList(),
+                UsageDays = usageDays.OrderBy(d => d.Day, StringComparer.Ordinal).ToList()
+            };
         }
         catch
         {
