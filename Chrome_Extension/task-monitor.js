@@ -15,47 +15,88 @@
     'button[data-testid="stop-generating-button"]'
   ];
 
+  // Current ChatGPT versions place the selected model/mode in a
+  // composer-local Radix pill without data-testid or aria-label.
+  // Keep the older header switcher selectors for previous UI versions.
   const modelSelectors = [
+    'form[data-chatgpt-composer] button.__composer-pill',
+    'button.__composer-pill',
+    'button[class*="__composer-pill"]',
+    'form[data-chatgpt-composer] button[aria-label*="model" i]',
+    'button[aria-label="Select ChatGPT model"]',
+    'form[data-chatgpt-composer] button[aria-haspopup="menu"][data-tone="neutral"]',
     'button[data-testid="model-switcher-dropdown-button"]',
     '[data-testid="model-switcher-dropdown-button"]',
     'button[data-testid*="model-switcher"]',
     'header button[aria-haspopup="menu"]'
   ];
-  const modelHint = /(?:\bGPT[-\s]?\d|\bGPT\b|\bo[134](?:[-\s]|$)|\bCodex\b|\bThinking\b|\bInstant\b|\bPro\b|\bAuto\b)/i;
-  const genericModelText = /^(?:ChatGPT|Model|模型|Choose model|Select model|New chat|新聊天)$/i;
+  const explicitModelHint = /(?:\\bGPT[-\\s]?\\d|\\bo[134](?:[-\\s]|$)|\\bCodex\\b)/i;
+  const bareModeHint = /^(?:instant|thinking|pro|auto|medium|high|extra high|very high|extended|pro extended|fast|balanced|standard|极速|快速|均衡|自动|思考|标准|高|中|极高|最新的|最新|深度思考|高级|扩展|最高)$/i;
+  const compactModeHint = /^(?:\\d+(?:\\.\\d+)?)(?:instant|thinking|pro|high|medium|均衡|高|中|极速)$/i;
+  const genericModelText = /^(?:ChatGPT|Model|模型|Choose model|Select model|Select ChatGPT model|New chat|新聊天|选择模型|选择 ChatGPT 模型)$/i;
 
   function normalizeModelLabel(value) {
-    const text = clean(value)
-      .replace(/^(?:model|模型)\s*[:：-]?\s*/i, '')
+    const label = clean(value)
+      .replace(/^(?:model|模型|模型选择)\\s*[:：-]?\\s*/i, '')
+      .replace(/^(?:ChatGPT)\\s+(?=GPT[-\\s]?\\d)/i, '')
       .replace(/[⌄▾▼]+$/g, '')
       .trim();
-    if (!text || text.length > 64 || genericModelText.test(text)) return null;
-    return modelHint.test(text) ? text : null;
+    if (!label || label.length > 64 || genericModelText.test(label)) return null;
+
+    // A full GPT or o-series name is a model, not just a mode.
+    // Never infer a GPT version from an Instant / Thinking / Pro tier alone.
+    if (explicitModelHint.test(label) && label.length <= 45) return label;
+
+    // The closed composer pill sometimes contains only a tier or effort label:
+    // 6Pro, Instant, Thinking, High, 均衡, etc.
+    if (bareModeHint.test(label) || compactModeHint.test(label)) return '模式：' + label;
+    return null;
   }
 
   function currentModelLabel() {
+    let modeOnly = null;
+
+    // Prefer explicitly selected items inside the CURRENT model picker,
+    // if it happens to be open. Never scan all options or conversation text.
+    const checkedSelectors = [
+      '[data-testid="composer-intelligence-picker-content"] [role="menuitemradio"][aria-checked="true"]',
+      '[data-testid="modal-intelligence-menu"] [role="radio"][aria-checked="true"]'
+    ];
+    for (const selector of checkedSelectors) {
+      for (const el of document.querySelectorAll(selector)) {
+        if (!visible(el)) continue;
+        const label = normalizeModelLabel(el.getAttribute('aria-label') || el.textContent);
+        if (label && !label.startsWith('模式：')) return label;
+        if (label && !modeOnly) modeOnly = label;
+      }
+    }
+
     for (const selector of modelSelectors) {
       for (const el of document.querySelectorAll(selector)) {
         if (!visible(el)) continue;
         const candidates = [
+          el.getAttribute('data-model'),
           el.getAttribute('aria-label'),
           el.getAttribute('title'),
           el.textContent
         ];
         for (const value of candidates) {
           const label = normalizeModelLabel(value);
-          if (label) return label;
+          if (!label) continue;
+          if (!label.startsWith('模式：')) return label;
+          if (!modeOnly) modeOnly = label;
         }
       }
     }
 
-    // Conservative fallback: only inspect buttons in the page header.
+    // Legacy header fallback. Explicit model name only: standalone "Thinking"
+    // or "High" in a header may describe something other than model choice.
     for (const el of document.querySelectorAll('header button')) {
       if (!visible(el)) continue;
       const label = normalizeModelLabel(el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent);
-      if (label) return label;
+      if (label && !label.startsWith('模式：')) return label;
     }
-    return null;
+    return modeOnly;
   }
 
   const usageIdleMs = 5 * 60 * 1000;
@@ -187,7 +228,8 @@
     const now = Date.now();
     const nextPhase = activePhase();
     const next = nextPhase !== null;
-    const model = currentModelLabel();
+    // Keep the last confirmed UI label while a transient picker redraws.
+    const model = currentModelLabel() || lastModel;
     const usageSeconds = 0; // Activity is sent by flushActiveUsage, not task updates.
     if (next && !active) startedAt = now;
     if (!next) startedAt = null;
@@ -283,5 +325,6 @@
     globalThis.__TOKEN_DESK_TASK_TEST_PHASE__ = text => phaseFromText(text);
     globalThis.__TOKEN_DESK_TASK_TEST_ACTION__ = text => actionText.test(clean(text));
     globalThis.__TOKEN_DESK_TASK_TEST_MODEL__ = text => normalizeModelLabel(text);
+    globalThis.__TOKEN_DESK_TASK_TEST_CURRENT_MODEL__ = currentModelLabel;
   }
 })();
