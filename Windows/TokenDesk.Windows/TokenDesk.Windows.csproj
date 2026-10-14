@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>TokenDesk</AssemblyName>
+    <RootNamespace>TokenDesk.WindowsApp</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>HaoWang310</Authors>
+    <Description>TokenDesk for Windows - ChatGPT quota and running task monitor.</Description>
+  </PropertyGroup>
+</Project>
