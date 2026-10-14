@@ -23,7 +23,7 @@ Current data path:
 
 After the first pairing, Chrome can stay in the background. You do **not** need to keep ChatGPT or the Usage page open.
 
-## Current version: v1.8.0
+## Current macOS version: v1.8.1
 
 Both desktop apps now support quota notifications:
 - 5-hour quota at 20% remaining or below
@@ -31,7 +31,7 @@ Both desktop apps now support quota notifications:
 - 5-hour quota reset
 - weekly quota reset
 
-v1.8.0 adds local seven-day usage statistics and model labels for active tasks.
+v1.8.1 synchronizes ChatGPT's current composer model/mode selector support (GPT-6 and explicitly labeled modes) and displays local Monday-Sunday active usage totals that reset each Monday at midnight, without changing ChatGPT's quota reset time.
 
 “Active time” means a ChatGPT tab is in the foreground and has had user interaction within the last five minutes. “Daily usage” is the drop in the weekly remaining quota, measured in percentage points; it is not a token count.
 
@@ -52,7 +52,7 @@ v1.8.0 adds macOS 12 Monterey / Intel x86_64 local-build compatibility and fixes
 - local macOS build/install flow
 - adaptive macOS menu-bar icon
 
-## Windows v1.2.0
+## Windows v1.2.4
 
 The Windows version is under `Windows/` and is built with **.NET 8 + WPF**.
 
