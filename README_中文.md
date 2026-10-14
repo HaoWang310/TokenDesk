@@ -6,9 +6,9 @@ TokenDesk 是面向 macOS 与 Windows 的 ChatGPT Work / Codex 剩余额度与�
 
 **Chrome 后台主动查询 → 本机 TokenDesk → 菜单栏 / 浮窗 / 额度历史**
 
-## Windows v1.1.0
+## Windows v1.1.1
 
-Windows v1.1.0 新增同样的四类额度提醒：5h 20%、周 20%、5h 刷新、周刷新。
+Windows v1.1.1 新增同样的四类额度提醒：5h 20%、周 20%、5h 刷新、周刷新。
 
 Windows 第一版已经加入同一 GitHub 仓库：
 
@@ -24,7 +24,7 @@ Windows 第一版已经加入同一 GitHub 仓库：
 
 Windows 详细说明见 [Windows/README.md](Windows/README.md)。
 
-## macOS v1.7.6 更新
+## macOS v1.7.7 更新
 
 - 5 小时额度剩余 20% 或以下时发送系统提醒；
 - 每周额度剩余 20% 或以下时发送系统提醒；
@@ -84,3 +84,5 @@ Windows 详细说明见 [Windows/README.md](Windows/README.md)。
 ## 隐私
 
 Chrome 登录凭据、Cookie、密码、聊天正文和 Authorization header 不会发送到 TokenDesk。Mac App 只接收净化后的额度百分比、重置信息、来源类型和同步时间。
+
+- v1.7.7 / Windows v1.1.1：修复空闲 ChatGPT Work 模式标签页被误判为正在“工作”。
