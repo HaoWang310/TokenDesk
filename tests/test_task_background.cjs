@@ -72,8 +72,8 @@ function sendTask(active){
     'a nonoverlapping 10s task interval must add 10s to the daily total');
   // After migration, old-format heartbeats from an unrefreshed tab must not
   // add another ten seconds on top of already timestamped session coverage.
-  assert(storage.tokenDeskSessionMigrationV1 &&
-    Number.isFinite(storage.tokenDeskSessionMigrationV1.at));
+  assert(storage.tokendeskSessionMigrationV1 &&
+    Number.isFinite(storage.tokendeskSessionMigrationV1.at));
   receiver({type:'TOKEN_DESK_ACTIVE_USAGE',
     payload:{usageDay:day,usageSeconds:10}
   },{url:'https://chatgpt.com/c/test',tab:{id:7}},()=>{});
