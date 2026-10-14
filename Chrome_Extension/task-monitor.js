@@ -300,6 +300,7 @@
   let lastModel = null;
   let resolvedModel = null;
   let modelRoute = location.pathname;
+  let resolvedModelReceivedAt = 0;
   let conversationFetchSeen = 0;
   let streamSeen = 0;
   let lastStreamStatus = 'not-observed';
@@ -324,6 +325,7 @@
         !/^(?:gpt-[a-z0-9][a-z0-9._-]*|o[1-9][a-z0-9._-]*)$/i.test(candidate)) return;
     resolvedModel = candidate;
     modelRoute = location.pathname;
+    resolvedModelReceivedAt = Date.now();
     lastStreamStatus = 'model-found';
     sendState(true);
   });
@@ -334,8 +336,17 @@
     const next = nextPhase !== null;
     // Keep the last confirmed UI label while a transient picker redraws.
     if (location.pathname !== modelRoute) {
-      resolvedModel = null;
-      lastModel = null;
+      // ChatGPT can begin a new conversation on / and navigate to /c/<id>
+      // only AFTER the SSE model metadata has arrived. Keep that fresh
+      // confirmed model through this one-time creation redirect.
+      const formerIsNewChat = modelRoute === '/' || modelRoute === '';
+      const newChatCreated = /^\/c\/[^/]+/.test(location.pathname);
+      const freshStream = resolvedModel && Date.now() - resolvedModelReceivedAt < 90_000;
+      if (!(formerIsNewChat && newChatCreated && freshStream)) {
+        resolvedModel = null;
+        resolvedModelReceivedAt = 0;
+        lastModel = null;
+      }
       modelRoute = location.pathname;
     }
     const model = resolvedModel || currentModelLabel() || lastModel;
