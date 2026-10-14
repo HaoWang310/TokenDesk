@@ -110,7 +110,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ROOT="$PWD/TokenDesk_v1.8.6"
+          ROOT="$PWD/TokenDesk_v1.8.7"
           rm -rf "$ROOT"
           mkdir -p "$ROOT/Chrome_Extension" "$ROOT/tests"
 
@@ -124,12 +124,12 @@ jobs:
           cp tests/* "$ROOT/tests/"
 
           chmod +x "$ROOT"/*.command
-          ditto -c -k --sequesterRsrc --keepParent "$ROOT" TokenDesk_Mac_v1.8.6_source.zip
+          ditto -c -k --sequesterRsrc --keepParent "$ROOT" TokenDesk_Mac_v1.8.7_source.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TokenDesk-Mac-v1.8.6
-          path: TokenDesk_Mac_v1.8.6_source.zip
+          name: TokenDesk-Mac-v1.8.7
+          path: TokenDesk_Mac_v1.8.7_source.zip
           if-no-files-found: error
           retention-days: 30
