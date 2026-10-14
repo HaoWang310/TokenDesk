@@ -4,6 +4,9 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using WpfBrush = System.Windows.Media.Brush;
+using WpfBrushes = System.Windows.Media.Brushes;
+using WpfColor = System.Windows.Media.Color;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 
@@ -85,8 +88,8 @@ public partial class MainWindow : Window
                 PageUrl = task.PageUrl,
                 PhaseLabel = task.Phase == TaskPhase.Thinking ? "思考" : "工作",
                 PhaseBrush = task.Phase == TaskPhase.Thinking
-                    ? new SolidColorBrush(Color.FromRgb(154, 181, 255))
-                    : new SolidColorBrush(Color.FromRgb(126, 207, 176)),
+                    ? new SolidColorBrush(WpfColor.FromRgb(154, 181, 255))
+                    : new SolidColorBrush(WpfColor.FromRgb(126, 207, 176)),
                 Elapsed = "已运行 " + Elapsed(task.StartedAt)
             });
         }
@@ -137,19 +140,19 @@ public partial class MainWindow : Window
             HistoryCanvas.Children.Add(new Line
             {
                 X1 = 0, X2 = width, Y1 = y, Y2 = y,
-                Stroke = new SolidColorBrush(Color.FromArgb(36, 255, 255, 255)),
+                Stroke = new SolidColorBrush(WpfColor.FromArgb(36, 255, 255, 255)),
                 StrokeThickness = 1
             });
         }
 
         AddSeries(points, start, end, width, height, p => p.FiveHourRemaining,
-            Color.FromRgb(126, 207, 176));
+            WpfColor.FromRgb(126, 207, 176));
         AddSeries(points, start, end, width, height, p => p.WeeklyRemaining,
-            Color.FromRgb(145, 168, 255));
+            WpfColor.FromRgb(145, 168, 255));
     }
 
     private void AddSeries(List<HistoryPoint> points, DateTimeOffset start, DateTimeOffset end,
-        double width, double height, Func<HistoryPoint, int?> selector, Color color)
+        double width, double height, Func<HistoryPoint, int?> selector, WpfColor color)
     {
         var series = new Polyline
         {
@@ -187,7 +190,7 @@ public partial class MainWindow : Window
 
     private void CopyPairing_Click(object sender, RoutedEventArgs e)
     {
-        Clipboard.SetText(_store.PairingCode);
+        System.Windows.Clipboard.SetText(_store.PairingCode);
     }
 
     private void TaskOpen_Click(object sender, RoutedEventArgs e)
@@ -203,7 +206,7 @@ public partial class MainWindow : Window
         var folder = Path.Combine(AppContext.BaseDirectory, "Chrome_Extension");
         if (!Directory.Exists(folder))
         {
-            MessageBox.Show("当前程序目录中没有 Chrome_Extension 文件夹。请使用 GitHub Actions 发布包。", "TokenDesk");
+            System.Windows.MessageBox.Show("当前程序目录中没有 Chrome_Extension 文件夹。请使用 GitHub Actions 发布包。", "TokenDesk");
             return;
         }
         Process.Start(new ProcessStartInfo("explorer.exe", $"\"{folder}\"") { UseShellExecute = true });
@@ -220,7 +223,7 @@ public partial class MainWindow : Window
         }
         catch
         {
-            MessageBox.Show($"无法自动打开 {exe}。请手动进入 {uri}", "TokenDesk");
+            System.Windows.MessageBox.Show($"无法自动打开 {exe}。请手动进入 {uri}", "TokenDesk");
         }
     }
 
@@ -243,7 +246,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show("无法修改开机启动设置：" + ex.Message, "TokenDesk");
+            System.Windows.MessageBox.Show("无法修改开机启动设置：" + ex.Message, "TokenDesk");
         }
     }
 
@@ -275,6 +278,6 @@ public sealed class TaskRowVm
     public string Title { get; set; } = "";
     public string PageUrl { get; set; } = "";
     public string PhaseLabel { get; set; } = "";
-    public Brush PhaseBrush { get; set; } = Brushes.White;
+    public WpfBrush PhaseBrush { get; set; } = WpfBrushes.White;
     public string Elapsed { get; set; } = "";
 }
