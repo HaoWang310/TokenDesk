@@ -153,6 +153,7 @@
     let dataLines = [];
     let scannedBytes = 0;
     let found = null;
+    let modelPublished = false;
     let status = 'stream-ended';
     emit('MODEL_TRACE', {status:'stream-observed'});
     // The stream stays open while ChatGPT is generating. Model metadata may
@@ -196,8 +197,6 @@
           if (!line) {
             found = processEvent();
             if (found) {
-              publishModel('MODEL',found,'resolved_model_slug',route);
-              buffer=''; dataLines=[];
               break;
             }
           } else if (line.startsWith('data:')) {
@@ -213,8 +212,17 @@
             }
           }
         }
+        if (found && !modelPublished) {
+          publishModel('MODEL',found,'resolved_model_slug',route);
+          modelPublished=true;
+          buffer=''; dataLines=[];
+        }
       }
       if (!found) found=processEvent();
+      if (found && !modelPublished) {
+        publishModel('MODEL',found,'resolved_model_slug',route);
+        modelPublished=true;
+      }
       if (!found) {
         if (scannedBytes >= 2097152) status='byte-limit';
         emit('MODEL_TRACE', {status});
