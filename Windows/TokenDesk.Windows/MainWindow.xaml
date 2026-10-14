@@ -92,7 +92,7 @@
                         <Border Grid.Column="2" Background="#151920" CornerRadius="10" Padding="10">
                             <StackPanel>
                                 <TextBlock Text="本周前台累计" Foreground="#7F8898" FontSize="9.5"/>
-                                <TextBlock x:Name="WeekActiveText" Text="0分" FontSize="18" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                <TextBlock x:Name="WeekActiveText" Text="0秒" FontSize="18" FontWeight="SemiBold" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Border>
                     </Grid>
