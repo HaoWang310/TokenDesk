@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>TokenDesk</AssemblyName>
     <RootNamespace>TokenDesk.WindowsApp</RootNamespace>
-    <Version>1.2.7</Version>
+    <Version>1.2.8</Version>
     <Authors>HaoWang310</Authors>
     <Description>TokenDesk for Windows - ChatGPT quota and running task monitor.</Description>
   </PropertyGroup>
