@@ -21,6 +21,102 @@ const pick = (obj, ...names) => {
 };
 const clampPct = n => Math.max(0, Math.min(100, Math.round(n)));
 
+const ACTIVE_USAGE_KEY = 'tokendeskDailyActiveUsageV1';
+const WEEKLY_USAGE_KEY = 'tokendeskDailyWeeklyQuotaUsedV1';
+const WEEKLY_BASELINE_KEY = 'tokendeskWeeklyQuotaBaselineV1';
+let statsWriteChain = Promise.resolve();
+
+function localDayKey(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function recentLocalDayKeys(count = 7) {
+  const keys = [];
+  const base = new Date();
+  base.setHours(12, 0, 0, 0);
+  for (let i = count - 1; i >= 0; i--) {
+    const d = new Date(base);
+    d.setDate(base.getDate() - i);
+    keys.push(localDayKey(d));
+  }
+  return keys;
+}
+
+function pruneDayMap(input, keep = 8) {
+  const out = {};
+  const keys = Object.keys(input || {})
+    .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k))
+    .sort()
+    .slice(-keep);
+  for (const key of keys) {
+    const value = Number(input[key]);
+    if (Number.isFinite(value) && value >= 0) out[key] = value;
+  }
+  return out;
+}
+
+function queueActiveUsage(dayKey, seconds) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey || '') ||
+      !Number.isInteger(seconds) || seconds <= 0 || seconds > 30) {
+    return statsWriteChain;
+  }
+  statsWriteChain = statsWriteChain.then(async () => {
+    const stored = await chrome.storage.local.get({[ACTIVE_USAGE_KEY]:{}});
+    const map = pruneDayMap(stored[ACTIVE_USAGE_KEY], 8);
+    map[dayKey] = Math.min(24 * 60 * 60, Math.max(0, Math.round((map[dayKey] || 0) + seconds)));
+    await chrome.storage.local.set({[ACTIVE_USAGE_KEY]:pruneDayMap(map, 8)});
+  }).catch(() => {});
+  return statsWriteChain;
+}
+
+function queueWeeklyQuotaSample(payload) {
+  if (!good(payload?.weeklyRemaining)) return statsWriteChain;
+  const remaining = payload.weeklyRemaining;
+  const resetAt = goodStamp(payload.weeklyResetsAt) ? payload.weeklyResetsAt : null;
+  const dayKey = localDayKey();
+
+  statsWriteChain = statsWriteChain.then(async () => {
+    const stored = await chrome.storage.local.get({
+      [WEEKLY_USAGE_KEY]:{},
+      [WEEKLY_BASELINE_KEY]:null
+    });
+    const map = pruneDayMap(stored[WEEKLY_USAGE_KEY], 8);
+    const previous = stored[WEEKLY_BASELINE_KEY];
+    if (previous && good(previous.remaining)) {
+      const sameCycle = previous.resetAt && resetAt
+        ? Number(previous.resetAt) === Number(resetAt)
+        : true;
+      if (sameCycle && remaining < previous.remaining) {
+        const delta = previous.remaining - remaining;
+        map[dayKey] = Math.min(500, Math.max(0, Math.round((map[dayKey] || 0) + delta)));
+      }
+    }
+    await chrome.storage.local.set({
+      [WEEKLY_USAGE_KEY]:pruneDayMap(map, 8),
+      [WEEKLY_BASELINE_KEY]:{remaining,resetAt,at:Date.now()}
+    });
+  }).catch(() => {});
+  return statsWriteChain;
+}
+
+async function usageDaysSnapshot() {
+  await statsWriteChain.catch(() => {});
+  const stored = await chrome.storage.local.get({
+    [ACTIVE_USAGE_KEY]:{},
+    [WEEKLY_USAGE_KEY]:{}
+  });
+  const active = pruneDayMap(stored[ACTIVE_USAGE_KEY], 8);
+  const quota = pruneDayMap(stored[WEEKLY_USAGE_KEY], 8);
+  return recentLocalDayKeys(7).map(day => ({
+    day,
+    activeSeconds: Math.max(0, Math.min(86_400, Math.round(active[day] || 0))),
+    weeklyQuotaUsed: Math.max(0, Math.min(500, Math.round(quota[day] || 0)))
+  }));
+}
+
 function classifyWindow(w) {
   if (!w || typeof w !== 'object') return null;
   const used = finiteNumber(pick(w, 'used_percent', 'usedPercent'));
@@ -99,6 +195,7 @@ async function probe() {
 }
 
 async function sendUsage(payload) {
+  await queueWeeklyQuotaSample(payload);
   const {pairingCode} = await chrome.storage.local.get({pairingCode:''});
   if (!/^[0-9a-f]{64}$/i.test(pairingCode)) {
     const status = '尚未配对：请复制 Mac TokenDesk 的完整配对码并保存。';
@@ -154,11 +251,17 @@ function sanitizeTaskMessage(message, sender) {
   const now = Date.now();
   const started = Number.isFinite(Number(p.startedAt)) ? Number(p.startedAt) * 1000 : now;
   const seen = Number.isFinite(Number(p.lastSeenAt)) ? Number(p.lastSeenAt) * 1000 : now;
+  const model = typeof p.model === 'string' ? p.model.replace(/\s+/g,' ').trim().slice(0,64) : '';
+  const usageDay = typeof p.usageDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.usageDay) ? p.usageDay : '';
+  const usageSeconds = Number.isInteger(p.usageSeconds) && p.usageSeconds >= 0 && p.usageSeconds <= 30 ? p.usageSeconds : 0;
   return {
     tabId: sender.tab.id,
     id: p.id,
     active: p.active,
     phase: p.phase === 'thinking' ? 'thinking' : 'working',
+    model,
+    usageDay,
+    usageSeconds,
     title: typeof p.title === 'string' ? p.title.replace(/\s+/g,' ').trim().slice(0,100) : 'ChatGPT 任务',
     pageURL: (p.pageURL || sender.url).slice(0,500),
     startedAt: Math.min(now, Math.max(now - 7 * 24 * 60 * 60 * 1000, started)),
@@ -181,10 +284,13 @@ async function sendTasksSnapshot() {
   const {pairingCode} = await chrome.storage.local.get({pairingCode:''});
   if (!/^[0-9a-f]{64}$/i.test(pairingCode)) return {ok:false,message:'任务监控等待配对。'};
   const tasks = currentTasks();
+  const usageDays = await usageDaysSnapshot();
   const payload = {
     observedAt: Math.floor(Date.now()/1000),
+    usageDays,
     tasks: tasks.map(t=>({
       id:t.id,phase:t.phase === 'thinking' ? 'thinking' : 'working',
+      model:t.model || '',
       title:t.title || 'ChatGPT 任务',pageURL:t.pageURL,
       startedAt:Math.floor(t.startedAt/1000),lastSeenAt:Math.floor(t.lastSeenAt/1000)
     }))
@@ -375,7 +481,8 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
     if (!task) return false;
     if (task.active) taskStates.set(task.tabId, task);
     else taskStates.delete(task.tabId);
-    scheduleTaskPublish();
+    queueActiveUsage(task.usageDay, task.usageSeconds)
+      .finally(() => scheduleTaskPublish());
     sendResponse({ok:true,count:currentTasks().length});
     return false;
   }
