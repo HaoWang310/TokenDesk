@@ -217,7 +217,7 @@ private final class TokenModel: ObservableObject {
 
     func refreshFreshnessClock(_ date: Date = Date()) {
         freshnessClock = date
-        if let taskSnapshotAt, date.timeIntervalSince(taskSnapshotAt) > 75, !runningTasks.isEmpty {
+        if let taskSnapshotAt = taskSnapshotAt, date.timeIntervalSince(taskSnapshotAt) > 75, !runningTasks.isEmpty {
             runningTasks = []
         }
     }
@@ -239,7 +239,7 @@ private final class TokenModel: ObservableObject {
     }
 
     var browserIsFresh: Bool {
-        guard liveReadingReceived, let browserUsage else { return false }
+        guard liveReadingReceived, let browserUsage = browserUsage else { return false }
         let age = freshnessClock.timeIntervalSince(browserUsage.observedAt)
         return age >= 0 && age <= 90
     }
