@@ -476,8 +476,10 @@
     if (msg?.type === 'TOKEN_DESK_MODEL_DIAGNOSTIC') {
       pingNetworkHook();
       sendState(true);
-      reply?.(modelDiagnostic());
-      return false;
+      // The MAIN-world handshake is dispatched asynchronously. Give the
+      // hook time to answer before constructing the diagnostics snapshot.
+      setTimeout(() => reply?.(modelDiagnostic()), 180);
+      return true;
     }
     if (msg?.type !== 'TOKEN_DESK_TASK_REFRESH') return false;
     sendState(true);
