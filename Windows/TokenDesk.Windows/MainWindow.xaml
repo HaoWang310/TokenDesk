@@ -163,12 +163,12 @@
                     <CheckBox x:Name="AutoStartCheck" Content="登录 Windows 后自动启动到托盘"
                               Foreground="#CDD2DC" Margin="0,4,0,0"
                               Checked="AutoStart_Changed" Unchecked="AutoStart_Changed"/>
-                    <TextBlock Text="提醒：5小时/每周剩余20%或以下会通知；额度刷新时也会通知。额度读取无需保持 ChatGPT 页面打开；运行任务监控需要对应 ChatGPT 网页标签页保持打开。"
+                    <TextBlock Text="提醒：5小时/每周的20%与刷新通知均按周期只发一次。额度读取不要求打开 ChatGPT 页面；模型识别和使用时长记录需要 Chrome/Edge 中的 ChatGPT 网页在前台，安装前的数据无法回溯。"
                                TextWrapping="Wrap" Foreground="#70798A" FontSize="9.5" Margin="0,8,0,0"/>
                 </StackPanel>
             </Border>
 
-            <TextBlock Text="TokenDesk Windows v1.2.0 · 本机仅监听 127.0.0.1:18743"
+            <TextBlock Text="TokenDesk Windows v1.2.2 · 本机仅监听 127.0.0.1:18743"
                        HorizontalAlignment="Center" Foreground="#555E6E" FontSize="9" Margin="0,14,0,2"/>
         </StackPanel>
     </ScrollViewer>
