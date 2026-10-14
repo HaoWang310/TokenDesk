@@ -207,7 +207,7 @@
     // Flush focus-loss transitions before clearing the previous interval;
     // do not count an entire hidden-page interval as foreground usage.
     previouslyFocused = focusedNow;
-    const confirmedWork = active && now - lastSent <= 45_000;
+    const confirmedWork = active && now - lastSent <= 90_000;
     if (now <= startAt || (!foreground && !confirmedWork)) return null;
     return {startAt, endAt:now, reason:foreground ? 'foreground' : 'task'};
   }
