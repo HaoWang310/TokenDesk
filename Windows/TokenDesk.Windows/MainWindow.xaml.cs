@@ -76,7 +76,10 @@ public partial class MainWindow : Window
     private void RefreshTasks()
     {
         var source = _store.Tasks
-            .Where(t => DateTimeOffset.UtcNow - t.LastSeenAt < TimeSpan.FromSeconds(90))
+            .Where(t => DateTimeOffset.UtcNow - t.LastSeenAt < TimeSpan.FromHours(2))
+            .ToList()
+            .Where(t => t.Phase == TaskPhase.Unverified ||
+                DateTimeOffset.UtcNow - t.LastSeenAt < TimeSpan.FromSeconds(45))
             .Take(20)
             .ToList();
 
@@ -92,22 +95,29 @@ public partial class MainWindow : Window
                     : (task.ModelName.StartsWith("模式：", StringComparison.Ordinal)
                         ? task.ModelName
                         : "模型：" + task.ModelName),
-                PhaseLabel = task.Phase == TaskPhase.Thinking ? "思考" : "工作",
+                PhaseLabel = task.Phase == TaskPhase.Unverified ||
+                             DateTimeOffset.UtcNow - task.LastSeenAt >= TimeSpan.FromSeconds(45)
+                             ? "状态待确认"
+                             : task.Phase == TaskPhase.Thinking ? "思考" : "工作",
                 PhaseBrush = task.Phase == TaskPhase.Thinking
                     ? new SolidColorBrush(WpfColor.FromRgb(154, 181, 255))
                     : new SolidColorBrush(WpfColor.FromRgb(126, 207, 176)),
-                Elapsed = "已运行 " + Elapsed(task.StartedAt)
+                Elapsed = task.Phase == TaskPhase.Unverified ||
+                          DateTimeOffset.UtcNow - task.LastSeenAt >= TimeSpan.FromSeconds(45)
+                    ? "网页已关闭或失联 · 无法确认云端是否继续运行"
+                    : "已运行 " + Elapsed(task.StartedAt)
             });
         }
 
-        var thinking = source.Count(t => t.Phase == TaskPhase.Thinking);
-        var working = source.Count(t => t.Phase == TaskPhase.Working);
+        var thinking = source.Count(t => t.Phase == TaskPhase.Thinking && DateTimeOffset.UtcNow - t.LastSeenAt < TimeSpan.FromSeconds(45));
+        var working = source.Count(t => t.Phase == TaskPhase.Working && DateTimeOffset.UtcNow - t.LastSeenAt < TimeSpan.FromSeconds(45));
         TaskSummaryText.Text = thinking + working == 0
             ? "任务 0"
             : string.Join(" · ", new[]
             {
                 thinking > 0 ? $"思考 {thinking}" : "",
-                working > 0 ? $"工作 {working}" : ""
+                working > 0 ? $"工作 {working}" : "",
+                source.Count(t => t.Phase == TaskPhase.Unverified || DateTimeOffset.UtcNow - t.LastSeenAt >= TimeSpan.FromSeconds(45)) is var pending && pending > 0 ? $"待确认 {pending}" : ""
             }.Where(x => x.Length > 0));
         NoTasksText.Visibility = source.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
