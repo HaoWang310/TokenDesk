@@ -1,4 +1,4 @@
-# TokenDesk for Windows v1.2.9
+# TokenDesk for Windows v1.2.10
 
 Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机桥接协议。
 
@@ -46,6 +46,7 @@ Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机
 
 Windows 端只接收净化后的额度字段与任务元数据（标题、URL、运行阶段、时间）。不会从 Chrome 扩展传输 ChatGPT 对话正文、密码、Cookie 或 bearer token 到 TokenDesk 桌面端。
 
+- v1.2.10 修复本周使用时间看似停滞的问题：使用时间原本按整分钟向下取整，现显示秒级精度（1分35秒），每约10秒从扩展同步记录。明确标注仅统计 Chrome/Edge 前台、拥有焦点且近期交互的 ChatGPT 使用时间；切换到 TokenDesk 或其他程序会暂停，不等于模型后台计算时长。无需清空已有统计，扩展继续使用 v1.8.8。
 - v1.2.9 加强模型识别：ChatGPT conversation SSE 支持更长时间的模型元数据监听、JSON patch 形式的 resolved_model_slug、首页转入新对话时保留已解析模型；浏览器扩展诊断展示已看到的 conversation 请求数/SSE 流数和最新解析状态。需要 Chrome/Edge 扩展 v1.8.8，刷新网页后发送新消息验证。该功能依赖 ChatGPT 非公开的网页响应格式。
 - v1.2.8 校准运行任务状态，避免把页面静态的“Working/正在工作”误判为活动任务；关闭 ChatGPT 标签页后最近已确认的任务转为“状态待确认”（本地最长保留 2 小时，并跨扩展后台重启保存），直到重新打开网页得到新状态。没有经验证的云端任务 API 时，不宣称网页关闭后仍在实时执行。
 - v1.2.7 通过 ChatGPT conversation SSE 响应中的 resolved_model_slug 自动识别本次任务模型，例如 gpt-6-thinking。仅发送校验后的模型标识，不传输回答正文；模型可在 Windows / Mac 任务列表和浏览器诊断中显示（Chrome 扩展 v1.8.6）。此来源是非公开网页协议，升级后仍需实际网页验证。
