@@ -336,6 +336,8 @@
   let streamOpen = false;
   let lastPositiveTaskEvidenceAt = 0;
   let streamTerminalSeen = false;
+  let runHadStream = false;
+  let streamClosedAt = 0;
   let hookStatus = 'not-checked';
   let hookVersion = '';
   let hookFetchActive = false;
@@ -372,10 +374,13 @@
       if (detail.status === 'open') {
         streamOpen = true;
         streamTerminalSeen = false;
+        runHadStream = true;
+        streamClosedAt = 0;
         lastPositiveTaskEvidenceAt = Date.now();
       } else {
         streamOpen = false;
         streamTerminalSeen = detail.status === 'closed';
+        streamClosedAt = streamTerminalSeen ? Date.now() : 0;
         if (streamTerminalSeen) lastPositiveTaskEvidenceAt = 0;
       }
       sendState(true);
@@ -443,12 +448,21 @@
         lastModel = null;
         streamOpen = false;
         streamTerminalSeen = false;
+        runHadStream = false;
+        streamClosedAt = 0;
         lastPositiveTaskEvidenceAt = 0;
       }
       modelRoute = location.pathname;
     }
     const nextPhase = activePhase();
     const next = nextPhase !== null;
+    // A completion is verified only if THIS run actually opened a stream,
+    // that stream then closed normally, and the task is now inactive.
+    // Missing buttons, a frozen tab and navigation never satisfy this.
+    const completionVerified = active && !next && runHadStream &&
+      streamTerminalSeen && streamClosedAt > 0 &&
+      now - streamClosedAt <= 30_000;
+    if (!next && active) runHadStream = false;
     const model = resolvedModel ||
       (requestedModel ? '请求模型：' + requestedModel : null) ||
       currentModelLabel() || lastModel;
@@ -470,6 +484,7 @@
       payload: {
         id: conversationID(),
         active,
+        completionVerified,
         phase: phase || 'working',
         model: model || '',
         title: safeTitle(),
