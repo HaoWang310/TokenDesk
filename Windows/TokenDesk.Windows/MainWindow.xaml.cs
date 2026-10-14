@@ -87,7 +87,11 @@ public partial class MainWindow : Window
             {
                 Title = task.Title,
                 PageUrl = task.PageUrl,
-                ModelLabel = string.IsNullOrWhiteSpace(task.ModelName) ? "模型：未识别" : "模型：" + task.ModelName,
+                ModelLabel = string.IsNullOrWhiteSpace(task.ModelName)
+                    ? "模型/模式：未识别"
+                    : (task.ModelName.StartsWith("模式：", StringComparison.Ordinal)
+                        ? task.ModelName
+                        : "模型：" + task.ModelName),
                 PhaseLabel = task.Phase == TaskPhase.Thinking ? "思考" : "工作",
                 PhaseBrush = task.Phase == TaskPhase.Thinking
                     ? new SolidColorBrush(WpfColor.FromRgb(154, 181, 255))
