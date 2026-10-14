@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TokenDesk 网页额度同步",
-  "version": "1.7.6",
+  "version": "1.7.7",
   "description": "Chrome 后台同步 ChatGPT 剩余额度，并监控已打开 ChatGPT 标签页中的思考 / 工作任务。",
   "permissions": [
     "storage",
