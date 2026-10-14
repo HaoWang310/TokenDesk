@@ -53,4 +53,6 @@ public sealed class PersistedState
     public List<HistoryPoint> History { get; set; } = new();
     public string FiveHourLowAlertCycle { get; set; } = "";
     public string WeeklyLowAlertCycle { get; set; } = "";
+    public string FiveHourResetAlertCycle { get; set; } = "";
+    public string WeeklyResetAlertCycle { get; set; } = "";
 }
