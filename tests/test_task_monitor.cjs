@@ -71,6 +71,24 @@ assert.strictEqual(report.taggedAssistantMessages,0);
 assert.ok(!('title' in report) && !('url' in report),'diagnostics must exclude URLs and chat titles');
 pill=null;checked=null;
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().reason,'picker-absent');
+
+// Page toolbars and old message text saying "Working" are never evidence of
+// a currently running ChatGPT generation.
+sandbox.document.querySelectorAll = selector => {
+  if (selector === 'span,p,div') return [fakeNode('Working')];
+  return [];
+};
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTIVE_PHASE__(),null);
+const stopControl=fakeNode('Stop generating',{'aria-label':'Stop generating'});
+stopControl.closest=()=>null;
+stopControl.disabled=false;
+sandbox.document.querySelectorAll = selector => {
+  if (selector === 'button,[role="button"]') return [stopControl];
+  return [];
+};
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTIVE_PHASE__(),'working');
+sandbox.document.querySelectorAll=()=>[];
+
 assert.strictEqual(typeof windowListeners.message,'function');
 windowListeners.message({
   source:pageWindow,origin:'https://chatgpt.com',
