@@ -40,9 +40,17 @@ public sealed class HistoryPoint
     public int? WeeklyRemaining { get; set; }
 }
 
+public sealed class QuotaAlertEvent
+{
+    public string Title { get; set; } = "";
+    public string Message { get; set; } = "";
+}
+
 public sealed class PersistedState
 {
     public string PairingCode { get; set; } = "";
     public QuotaSnapshotState? LastQuota { get; set; }
     public List<HistoryPoint> History { get; set; } = new();
+    public string FiveHourLowAlertCycle { get; set; } = "";
+    public string WeeklyLowAlertCycle { get; set; } = "";
 }
