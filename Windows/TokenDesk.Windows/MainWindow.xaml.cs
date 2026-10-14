@@ -149,7 +149,7 @@ public partial class MainWindow : Window
         TodayActiveText.Text = DurationText(today?.ActiveSeconds ?? 0);
         WeekActiveText.Text = DurationText(totalSeconds);
         WeekQuotaTotalText.Text =
-            $"本周用量累计：{totalQuota} 个百分点 · 统计周期 {monday:MM/dd}–{monday.AddDays(6):MM/dd}（每周一 00:00 清零）。使用时间每约 10 秒由扩展上报，精确到秒；只在 Chrome/Edge 的 ChatGPT 网页可见、拥有焦点且最近 5 分钟有交互时累计。切换到本窗口或其他程序会暂停，后台模型运行时长不计入实际使用时间。安装前历史无法补录；不会改变官方额度。";
+            $"本周用量累计：{totalQuota} 个百分点 · 统计周期 {monday:MM/dd}–{monday.AddDays(6):MM/dd}（每周一 00:00 清零）。GPT 总使用时长 = ChatGPT 网页前台活跃时间 + 已确认的后台 Thinking / Working 任务时间，重叠只计算一次。每约 10 秒同步，周一清零；闲置网页、关闭后状态待确认的任务和桌面版 ChatGPT 暂不计入。安装前历史无法补录；不会改变官方额度。";
 
         DrawBarChart(ActiveUsageCanvas, days,
             d => d.ActiveSeconds,
