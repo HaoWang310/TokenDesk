@@ -206,10 +206,7 @@ public partial class MainWindow : Window
             Canvas.SetTop(valueLabel, Math.Max(0, top - 15));
             canvas.Children.Add(valueLabel);
 
-            var dateParts = days[i].Day.Split('-');
-            var dateLabel = dateParts.Length == 3
-                ? $"{int.TryParse(dateParts[1], out var month) switch { true => month, false => 0 }}/{int.TryParse(dateParts[2], out var day) switch { true => day, false => 0 }}"
-                : days[i].Day;
+            var dateLabel = ShortDayLabel(days[i].Day);
             var label = new TextBlock
             {
                 Text = dateLabel,
@@ -222,6 +219,16 @@ public partial class MainWindow : Window
             Canvas.SetTop(label, height - 18);
             canvas.Children.Add(label);
         }
+    }
+
+    private static string ShortDayLabel(string value)
+    {
+        var parts = value.Split('-');
+        if (parts.Length == 3 &&
+            int.TryParse(parts[1], out var month) &&
+            int.TryParse(parts[2], out var day))
+            return $"{month}/{day}";
+        return value;
     }
 
     private static string DurationText(int seconds)
