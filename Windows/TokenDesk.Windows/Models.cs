@@ -5,7 +5,8 @@ namespace TokenDesk.WindowsApp;
 public enum TaskPhase
 {
     Thinking,
-    Working
+    Working,
+    Unverified
 }
 
 public sealed class QuotaWindowState
