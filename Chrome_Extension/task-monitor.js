@@ -146,6 +146,34 @@
     };
   }
 
+  // When a Chromium extension is reloaded, old ChatGPT pages can keep
+  // executing the invalidated content script until the page itself reloads.
+  // Consume callback errors and safely retire that outdated script.
+  let monitorContextValid = true;
+  function sendMonitorMessage(message) {
+    if (!monitorContextValid) return;
+    try {
+      const pending = chrome.runtime.sendMessage(message, () => {
+        let error = null;
+        try { error = chrome.runtime.lastError; } catch (cause) { error = cause; }
+        if (/extension context invalidated|context invalidated/i.test(String(error?.message || error || ''))) {
+          monitorContextValid = false;
+        }
+      });
+      if (pending && typeof pending.catch === 'function') {
+        pending.catch(cause => {
+          if (/extension context invalidated|context invalidated/i.test(String(cause?.message || cause || ''))) {
+            monitorContextValid = false;
+          }
+        });
+      }
+    } catch (cause) {
+      // A thrown sendMessage is possible after extension reload. Never
+      // propagate it to ChatGPT or repeatedly retry with the same old script.
+      monitorContextValid = false;
+    }
+  }
+
   const usageIdleMs = 5 * 60 * 1000;
   let lastInteractionAt = Date.now();
   let usageTickAt = Date.now();
@@ -181,10 +209,10 @@
     const now = Date.now();
     const seconds = takeActiveUsageSeconds(now);
     if (seconds <= 0) return;
-    chrome.runtime.sendMessage({
+    sendMonitorMessage({
       type: 'TOKEN_DESK_ACTIVE_USAGE',
       payload: { usageDay: localDayKey(new Date(now)), usageSeconds: seconds }
-    }).catch(() => {});
+    });
   }
 
   function visible(el) {
@@ -286,7 +314,7 @@
     lastModel = model;
     if (!force && !changed && usageSeconds === 0 && (!active || now - lastSent < 5000)) return;
     lastSent = now;
-    chrome.runtime.sendMessage({
+    sendMonitorMessage({
       type: 'TOKEN_DESK_TASK_STATE',
       payload: {
         id: conversationID(),
@@ -300,7 +328,7 @@
         usageDay: localDayKey(new Date(now)),
         usageSeconds
       }
-    }).catch(() => {});
+    });
   }
 
   const observer = new MutationObserver(() => {
@@ -343,7 +371,7 @@
     const usageSeconds = 0;
     const wasActive = active;
     active = false;
-    chrome.runtime.sendMessage({
+    sendMonitorMessage({
       type:'TOKEN_DESK_TASK_STATE',
       payload:{
         id:conversationID(),
@@ -366,6 +394,7 @@
   // Dynamic heartbeat: active tasks report more often, idle tabs less often.
   function scheduleHeartbeat() {
     setTimeout(() => {
+      if (!monitorContextValid) return;
       sendState(false);
       scheduleHeartbeat();
     }, active ? 5000 : 15000);
