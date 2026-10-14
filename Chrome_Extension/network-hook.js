@@ -10,6 +10,23 @@
   let requestTemplate = null;
   let lastPayload = null;
   let refreshBusy = false;
+  const HOOK_VERSION = '1.8.12';
+  let lastModelSignal = null;
+  let fetchWrapper = null;
+  const MAX_REPLAY_AGE_MS = 5 * 60 * 1000;
+  function publishModel(type, model, source, route) {
+    const record = {
+      type, model, source,
+      route: typeof route === 'string' ? route.slice(0, 300) : location.pathname,
+      at: Date.now()
+    };
+    if (type === 'MODEL' || !lastModelSignal || lastModelSignal.type !== 'MODEL' ||
+        lastModelSignal.route !== record.route) {
+      lastModelSignal = record;
+    }
+    emit(type, { model, source, route:record.route });
+  }
+
 
   const finiteNumber = v => typeof v === 'number' && Number.isFinite(v) ? v :
     (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : null);
@@ -48,13 +65,13 @@
     } catch { return null; }
   }
 
-  function observeConversationRequest(input, init) {
+  function observeConversationRequest(input, init, route) {
     const requestMethod = String(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
     if (requestMethod !== 'POST') return;
     const body = init?.body;
     if (typeof body === 'string') {
       const found = requestModelFromJSON(body);
-      if (found) emit('REQUEST_MODEL', {model:found,source:'request_body'});
+      if (found) publishModel('REQUEST_MODEL',found,'request_body',route);
       return;
     }
     // Support fetch(Request) without changing its response or forwarding
@@ -127,7 +144,7 @@
     return null;
   }
 
-  async function inspectConversationStream(response, url) {
+  async function inspectConversationStream(response, url, route) {
     if (!response?.ok || !isConversationURL(url) || !response.body ||
         !String(response.headers?.get?.('content-type') || '').includes('text/event-stream')) return;
     const reader = response.body.getReader();
@@ -185,7 +202,7 @@
       }
       if (!found) found=processEvent();
       if (found) {
-        emit('MODEL', {model:found,source:'resolved_model_slug'});
+        publishModel('MODEL',found,'resolved_model_slug',route);
       } else {
         if (scannedBytes >= 2097152) status='byte-limit';
         emit('MODEL_TRACE', {status});
@@ -285,23 +302,25 @@
   }
 
   if (nativeFetch) {
-    window.fetch = async function(input, init) {
+    fetchWrapper = async function(input, init) {
       let url = '';
       try { url = input instanceof Request ? input.url : String(input); } catch {}
       if (isUsageURL(url)) rememberFetchRequest(input, init);
-      if (isConversationURL(url)) observeConversationRequest(input, init);
+      const requestRoute = location.pathname;
+      if (isConversationURL(url)) observeConversationRequest(input, init, requestRoute);
       const response = await nativeFetch(input, init);
       if (isUsageURL(url)) inspectResponse(response.clone(), url);
       if (isConversationURL(url)) {
         emit('MODEL_TRACE', {status:'conversation-fetch-seen'});
         if (response.ok && String(response.headers?.get?.('content-type') || '').includes('text/event-stream')) {
-          inspectConversationStream(response.clone(), url).catch(()=>{});
+          inspectConversationStream(response.clone(), url, requestRoute).catch(()=>{});
         } else {
           emit('MODEL_TRACE', {status:'not-event-stream'});
         }
       }
       return response;
     };
+    window.fetch = fetchWrapper;
   }
 
   if (NativeXHR) {
@@ -330,7 +349,17 @@
     if (event.source !== window || event.origin !== location.origin) return;
     const m = event.data;
     if (!m || m.channel !== CHANNEL) return;
-    if (m.type === 'REFRESH') replayUsageRequest();
+    if (m.type === 'TOKEN_DESK_HOOK_PING') {
+      emit('HOOK_STATUS', {
+        hookVersion:HOOK_VERSION,
+        fetchWrapped:!!fetchWrapper && window.fetch === fetchWrapper
+      });
+      const saved = lastModelSignal;
+      if (saved && Date.now()-saved.at < MAX_REPLAY_AGE_MS) {
+        publishModel(saved.type, saved.model, saved.source, saved.route);
+      }
+    }
+    else if (m.type === 'REFRESH') replayUsageRequest();
     else if (m.type === 'REPLAY_LAST') {
       emit('READY', { ready: !!requestTemplate });
       if (lastPayload) emit('USAGE', { payload: lastPayload });
@@ -346,5 +375,8 @@
     globalThis.__TOKEN_DESK_TEST_PARSE__ = parseUsageJSON;
     globalThis.__TOKEN_DESK_TEST_MODEL_FROM_EVENT__ = resolvedModelFromEvent;
     globalThis.__TOKEN_DESK_TEST_REQUEST_MODEL__ = requestModelFromJSON;
+    globalThis.__TOKEN_DESK_TEST_HOOK_STATUS__ = () => ({
+      version:HOOK_VERSION,wrapped:window.fetch===fetchWrapper
+    });
   }
 })();
