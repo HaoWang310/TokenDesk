@@ -28,6 +28,105 @@
     } catch { return false; }
   }
 
+  // Observe only same-origin ChatGPT conversation event streams. Never
+  // transmit, log, save, or parse the answer text outside this page context.
+  function isConversationURL(raw) {
+    try {
+      const u = new URL(String(raw), location.href);
+      if (u.origin !== location.origin) return false;
+      return u.pathname === '/backend-api/f/conversation' ||
+        u.pathname === '/backend-api/conversation';
+    } catch { return false; }
+  }
+
+  function validResolvedSlug(value) {
+    return typeof value === 'string' && value.length <= 64 &&
+      /^(?:gpt-[a-z0-9][a-z0-9._-]*|o[1-9][a-z0-9._-]*)$/i.test(value)
+      ? value : null;
+  }
+
+  // Parse JSON envelopes only. String content from a ChatGPT answer must not
+  // be interpreted as model metadata even when it mentions model_slug.
+  function resolvedModelFromEvent(envelope) {
+    if (!envelope || typeof envelope !== 'object') return null;
+    const stack = [{node: envelope, depth: 0}];
+    let visited = 0;
+    while (stack.length && visited++ < 120) {
+      const {node, depth} = stack.pop();
+      if (!node || typeof node !== 'object' || depth > 7) continue;
+      const found = validResolvedSlug(node.resolved_model_slug);
+      if (found) return found;
+      // Keep only metadata-bearing tree paths. Do not inspect user/assistant
+      // content, tool arguments, attachment data or message text.
+      for (const [key, value] of Object.entries(node)) {
+        if (/^(?:content|parts|text|body|arguments|attachments|input|output)$/i.test(key)) continue;
+        if (value && typeof value === 'object') {
+          if (Array.isArray(value)) {
+            for (let i = Math.min(12,value.length) - 1; i >= 0; i--) {
+              if (value[i] && typeof value[i] === 'object') stack.push({node:value[i],depth:depth+1});
+            }
+          } else stack.push({node:value,depth:depth+1});
+        }
+      }
+    }
+    return null;
+  }
+
+  async function inspectConversationStream(response, url) {
+    if (!response?.ok || !isConversationURL(url) || !response.body ||
+        !String(response.headers?.get?.('content-type') || '').includes('text/event-stream')) return;
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let dataLines = [];
+    let scannedBytes = 0;
+    let found = null;
+    // Limit total bytes and observation time. Never buffer a complete
+    // conversation or delay the app's original Response consumer.
+    let timedOut = false;
+    const timeoutId = typeof setTimeout === 'function'
+      ? setTimeout(() => { timedOut=true; reader.cancel().catch(()=>{}); }, 15000) : null;
+
+    function processEvent() {
+      if (!dataLines.length) return null;
+      const source = dataLines.join('\n');
+      dataLines = [];
+      if (source.length > 50000) return null;
+      try { return resolvedModelFromEvent(JSON.parse(source)); }
+      catch { return null; }
+    }
+
+    try {
+      while (!found && !timedOut && scannedBytes < 196608) {
+        const {value,done} = await reader.read();
+        if (done) break;
+        scannedBytes += value.byteLength;
+        buffer += decoder.decode(value, {stream:true});
+        // A single giant SSE line can contain answer text. Never hold it.
+        if (buffer.length > 65536) break;
+        let index;
+        while ((index=buffer.indexOf('\n')) !== -1) {
+          let line = buffer.slice(0,index);
+          if (line.endsWith('\r')) line=line.slice(0,-1);
+          buffer=buffer.slice(index+1);
+          if (!line) {
+            found = processEvent();
+            if (found) break;
+          } else if (line.startsWith('data:')) {
+            const data = line.slice(5).trimStart();
+            if (dataLines.join('').length + data.length < 50000) dataLines.push(data);
+            else dataLines=[];
+          }
+        }
+      }
+      if (!found) found=processEvent();
+      if (found) emit('MODEL', {model:found,source:'resolved_model_slug'});
+    } catch {} finally {
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      try { await reader.cancel(); } catch {}
+    }
+  }
+
   function classifyWindow(w) {
     if (!w || typeof w !== 'object') return null;
     const used = finiteNumber(pick(w, 'used_percent', 'usedPercent'));
@@ -123,6 +222,10 @@
       if (isUsageURL(url)) rememberFetchRequest(input, init);
       const response = await nativeFetch(input, init);
       if (isUsageURL(url)) inspectResponse(response.clone(), url);
+      if (isConversationURL(url) && response.ok &&
+          String(response.headers?.get?.('content-type') || '').includes('text/event-stream')) {
+        inspectConversationStream(response.clone(), url).catch(()=>{});
+      }
       return response;
     };
   }
@@ -165,5 +268,8 @@
   }, 15_000);
 
   emit('READY', { ready: false });
-  if (globalThis.__TOKEN_DESK_TEST__) globalThis.__TOKEN_DESK_TEST_PARSE__ = parseUsageJSON;
+  if (globalThis.__TOKEN_DESK_TEST__) {
+    globalThis.__TOKEN_DESK_TEST_PARSE__ = parseUsageJSON;
+    globalThis.__TOKEN_DESK_TEST_MODEL_FROM_EVENT__ = resolvedModelFromEvent;
+  }
 })();
