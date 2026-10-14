@@ -3,7 +3,7 @@ import SwiftUI
 import Combine
 import UserNotifications
 
-// TokenDesk v1.8.0 monitors quota, running ChatGPT web tasks, and quota alerts.
+// TokenDesk v1.8.1 monitors quota, running ChatGPT web tasks, and quota alerts.
 // Data path: Chrome extension -> loopback BrowserBridge -> quota history + live task state.
 // There is no Codex CLI process launch, ~/.codex log scan, token accounting,
 // Admin Usage API key, or background Codex polling in this build.
@@ -814,7 +814,7 @@ private struct RunningTasksSection: View {
                             .padding(.vertical, 2)
                             .background(Color.white.opacity(0.055), in: Capsule())
                         if let modelName = task.modelName {
-                            Text(modelName)
+                            Text(modelName.hasPrefix("模式：") ? modelName : "模型：" + modelName)
                                 .font(.system(size: 8.5, weight: .medium))
                                 .foregroundColor(Color(red: 0.72, green: 0.78, blue: 1.00))
                                 .lineLimit(1)
@@ -850,38 +850,73 @@ private struct RunningTasksSection: View {
 private struct WeeklyUsageSection: View {
     let days: [DailyUsageStat]
 
-    private var today: DailyUsageStat? { days.last }
-    private var totalSeconds: Int { days.reduce(0) { $0 + $1.activeSeconds } }
-    private var totalQuota: Int { days.reduce(0) { $0 + $1.weeklyQuotaUsed } }
+    // Keep the seven chart columns aligned to the local Monday-Sunday week,
+    // including a fresh blank week before the Chrome extension reports it.
+    // This does not change the official ChatGPT weekly quota reset schedule.
+    private var calendarWeekDays: [DailyUsageStat] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let weekday = calendar.component(.weekday, from: today)
+        let daysSinceMonday = (weekday + 5) % 7
+        guard let monday = calendar.date(byAdding: .day, value: -daysSinceMonday, to: today) else {
+            return days
+        }
+
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        return (0..<7).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: offset, to: monday) else {
+                return nil
+            }
+            let key = formatter.string(from: date)
+            return days.first(where: { $0.day == key })
+                ?? DailyUsageStat(day: key, activeSeconds: 0, weeklyQuotaUsed: 0)
+        }
+    }
+
+    private var currentDayKey: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
+    }
+
+    private var today: DailyUsageStat? {
+        calendarWeekDays.first(where: { $0.day == currentDayKey })
+    }
+    private var totalSeconds: Int { calendarWeekDays.reduce(0) { $0 + $1.activeSeconds } }
+    private var totalQuota: Int { calendarWeekDays.reduce(0) { $0 + $1.weeklyQuotaUsed } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("近 7 天使用统计")
+                Text("本周使用统计（周一至周日）")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.white.opacity(0.78))
                 Spacer()
-                Text("Chrome 本机记录")
+                Text("每周一清零")
                     .font(.system(size: 9.5))
                     .foregroundColor(.white.opacity(0.38))
             }
 
             HStack(spacing: 9) {
                 metric(title: "今天使用时间", value: durationText(today?.activeSeconds ?? 0))
-                metric(title: "7 天累计", value: durationText(totalSeconds))
+                metric(title: "本周累计", value: durationText(totalSeconds))
             }
 
             barCard(title: "每日使用时间",
-                    values: days.map { Double($0.activeSeconds) },
-                    labels: days.map { dayLabel($0.day) },
+                    values: calendarWeekDays.map { Double($0.activeSeconds) },
+                    labels: calendarWeekDays.map { dayLabel($0.day) },
                     valueText: { durationText(Int($0)) })
 
             barCard(title: "每日用量",
-                    values: days.map { Double($0.weeklyQuotaUsed) },
+                    values: calendarWeekDays.map { Double($0.weeklyQuotaUsed) },
                     labels: days.map { dayLabel($0.day) },
                     valueText: { "\(Int($0))%" })
 
-            Text("“使用时间”= ChatGPT 标签页位于前台且最近 5 分钟内有交互的时间；多个标签页不会重复累计。“每日用量”= 每周剩余额度当日下降的百分点，不是 Token 数。7 天用量累计：\(totalQuota)%。")
+            Text("“使用时间”= ChatGPT 标签页位于前台且最近 5 分钟内有交互的时间；多个标签页不会重复累计。“每日用量”= 每周剩余额度当日下降的百分点，不是 Token 数。本周用量累计：\(totalQuota) 个百分点。统计从每周一 00:00 开始，旧周记录不计入本周；不影响 ChatGPT 官方额度刷新。")
                 .font(.system(size: 9.2))
                 .foregroundColor(.white.opacity(0.38))
                 .fixedSize(horizontal: false, vertical: true)
@@ -950,7 +985,9 @@ private struct WeeklyUsageSection: View {
     }
 
     private func durationText(_ seconds: Int) -> String {
-        let minutes = max(0, seconds) / 60
+        if seconds <= 0 { return "0分" }
+        if seconds < 60 { return "不足1分" }
+        let minutes = seconds / 60
         if minutes < 60 { return "\(minutes)分" }
         return "\(minutes / 60)时\(minutes % 60)分"
     }
