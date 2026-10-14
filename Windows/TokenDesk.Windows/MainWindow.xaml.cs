@@ -77,9 +77,6 @@ public partial class MainWindow : Window
     {
         var source = _store.Tasks
             .Where(t => DateTimeOffset.UtcNow - t.LastSeenAt < TimeSpan.FromHours(2))
-            .ToList()
-            .Where(t => t.Phase == TaskPhase.Unverified ||
-                DateTimeOffset.UtcNow - t.LastSeenAt < TimeSpan.FromSeconds(45))
             .Take(20)
             .ToList();
 
