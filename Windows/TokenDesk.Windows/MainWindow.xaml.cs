@@ -125,7 +125,7 @@ public partial class MainWindow : Window
         TodayActiveText.Text = DurationText(today?.ActiveSeconds ?? 0);
         WeekActiveText.Text = DurationText(totalSeconds);
         WeekQuotaTotalText.Text =
-            $"7 天用量累计：{totalQuota}%。使用时间仅统计 ChatGPT 标签页前台且最近 5 分钟有交互的时间；用量不是 Token 数。";
+            $"7 天用量累计：{totalQuota}%。使用时间只记录 Chrome/Edge 中前台活跃的 ChatGPT 网页；安装前记录不会补录。若持续为 0，请重新加载浏览器扩展并刷新 ChatGPT 网页；用量不是 Token 数。";
 
         DrawBarChart(ActiveUsageCanvas, days,
             d => d.ActiveSeconds,
@@ -233,7 +233,9 @@ public partial class MainWindow : Window
 
     private static string DurationText(int seconds)
     {
-        var minutes = Math.Max(0, seconds) / 60;
+        if (seconds <= 0) return "0分";
+        if (seconds < 60) return "不足1分";
+        var minutes = seconds / 60;
         if (minutes < 60) return $"{minutes}分";
         return $"{minutes / 60}时{minutes % 60}分";
     }
