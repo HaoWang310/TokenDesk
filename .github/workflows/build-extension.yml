@@ -34,7 +34,7 @@ jobs:
       - name: Upload extension only (desktop reinstall not required)
         uses: actions/upload-artifact@v4
         with:
-          name: TokenDesk-Chrome-Extension-v1.8.13
+          name: TokenDesk-Chrome-Extension-v1.8.14
           path: Chrome_Extension/
           if-no-files-found: error
           retention-days: 30
