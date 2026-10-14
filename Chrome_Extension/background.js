@@ -536,7 +536,7 @@ async function diagnoseOpenModelPickers() {
         model: String(result.model || '').slice(0, 64),
         lastModel: String(result.lastModel || '').slice(0, 64),
         modelSource: result.modelSource === 'resolved_model_slug' ? 'resolved_model_slug'
-          : 'page-selector',
+          : result.modelSource === 'request_body' ? 'request_body' : 'page-selector',
         conversationFetchSeen: Math.max(0, Math.min(1000, Number(result.conversationFetchSeen) || 0)),
         streamSeen: Math.max(0, Math.min(1000, Number(result.streamSeen) || 0)),
         lastStreamStatus: typeof result.lastStreamStatus === 'string'
