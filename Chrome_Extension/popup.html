@@ -8,6 +8,7 @@ button{margin-top:6px!important}body{font:13px -apple-system,BlinkMacSystemFont,
 <button id="save">保存配对</button><button id="health" class="secondary">测试本机连接</button><button id="scan" class="secondary">立即后台查询</button>
 <div class="state" id="state">正在检查...</div>
 <div class="state" id="last" aria-live="polite">正在读取历史同步状态...</div>
+<label style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;color:#d5eee7;font-size:12px"><input id="completion-notice" type="checkbox" style="width:16px;height:16px;margin:0;accent-color:#41c7ab">任务完成时提醒我（点击通知返回对话）</label>
 <button id="model-check" class="secondary">检查模型识别</button>
 <div class="state" id="model-diagnostic" aria-live="polite">模型识别诊断：点击按钮检查已打开的 ChatGPT 网页。</div>
 <p><b>Chrome 后台主动查询：</b>只要 Chrome 正在运行并且仍登录 ChatGPT，扩展会约每 30 秒查询一次额度。<b>不需要打开 ChatGPT，也不需要打开“设置 → 用量”。</b></p>
