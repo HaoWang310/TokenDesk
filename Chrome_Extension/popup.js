@@ -87,9 +87,14 @@ document.getElementById('model-check').addEventListener('click', () => {
       } else {
         lines.push(label + '找到 ' + item.visiblePickerCount + ' 个模型按钮，但按钮未提供可识别的名称');
       }
-      if (item.status !== 'recognized' && item.status !== 'content-script-missing') {
-        lines.push('  网页监听脚本：' + item.scriptVersion +
-          ' · 回复模型属性节点：' + item.taggedAssistantMessages);
+      if (item.status !== 'content-script-missing') {
+        lines.push('  网络 conversation 请求：' + (item.conversationFetchSeen || 0) +
+          ' · SSE 流：' + (item.streamSeen || 0) +
+          ' · 最新状态：' + (item.lastStreamStatus || 'not-observed'));
+        if (item.status !== 'recognized') lines.push(
+          '  网页监听脚本：' + item.scriptVersion +
+          ' · 回复模型属性节点：' + item.taggedAssistantMessages
+        );
       }
     }
     lines.push('如果仍显示未识别，请把此诊断结果截图发来；诊断不包含聊天正文。');
