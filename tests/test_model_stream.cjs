@@ -14,6 +14,10 @@ const window={
 const context={window,location,URL,Request,Response,TextDecoder,setInterval:()=>{},setTimeout,clearTimeout,console,__TOKEN_DESK_TEST__:true};
 vm.runInNewContext(code,context);
 const parse=context.__TOKEN_DESK_TEST_MODEL_FROM_EVENT__;
+const requested=context.__TOKEN_DESK_TEST_REQUEST_MODEL__;
+assert.equal(requested(JSON.stringify({model:'gpt-6-thinking',messages:[{content:'private'}]})),'gpt-6-thinking');
+assert.equal(requested(JSON.stringify({model:'auto'})),null);
+assert.equal(requested(JSON.stringify({content:'gpt-6-thinking'})),null);
 assert.equal(parse({resolved_model_slug:'gpt-6-thinking'}),'gpt-6-thinking');
 assert.equal(parse({message:{metadata:{resolved_model_slug:'gpt-6-thinking'}}}),'gpt-6-thinking');
 assert.equal(parse({p:'/message/metadata',v:JSON.stringify({resolved_model_slug:'gpt-6-thinking'})}),'gpt-6-thinking');
