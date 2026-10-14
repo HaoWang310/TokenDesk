@@ -181,7 +181,7 @@ public partial class MainWindow : Window
             var left = i * slot + (slot - barWidth) / 2.0;
             var top = chartBottom - barHeight;
 
-            var bar = new Rectangle
+            var bar = new System.Windows.Shapes.Rectangle
             {
                 Width = barWidth,
                 Height = barHeight,
