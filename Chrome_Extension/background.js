@@ -23,6 +23,7 @@ const clampPct = n => Math.max(0, Math.min(100, Math.round(n)));
 
 const ACTIVE_USAGE_KEY = 'tokendeskDailyActiveUsageV1';
 const SESSION_INTERVAL_KEY = 'tokendeskSessionIntervalsV1';
+const SESSION_MIGRATION_KEY = 'tokendeskSessionMigrationV1';
 const WEEKLY_USAGE_KEY = 'tokendeskDailyWeeklyQuotaUsedV1';
 const WEEKLY_BASELINE_KEY = 'tokendeskWeeklyQuotaBaselineV1';
 let statsWriteChain = Promise.resolve();
@@ -94,9 +95,21 @@ function mergeUsageRange(ranges, start, end) {
 
 function queueSessionInterval(startAt, endAt) {
   statsWriteChain = statsWriteChain.then(async () => {
-    const stored = await chrome.storage.local.get({[SESSION_INTERVAL_KEY]:{}});
+    const stored = await chrome.storage.local.get({
+      [SESSION_INTERVAL_KEY]:{},
+      [SESSION_MIGRATION_KEY]:null,
+      [ACTIVE_USAGE_KEY]:{}
+    });
+    // The first interval defines the switch from legacy accumulated seconds
+    // to timestamped wall-clock intervals. Freeze the old totals at this
+    // point, otherwise mixed v1.8.8 / v1.8.9 scripts double-count time.
+    const existing = stored[SESSION_MIGRATION_KEY];
+    const migrationAt = existing && Number.isFinite(existing.at)
+      ? existing.at : startAt;
+    const baseline = existing && existing.legacy && typeof existing.legacy === 'object'
+      ? existing.legacy : pruneDayMap(stored[ACTIVE_USAGE_KEY]);
     const map = pruneSessionIntervals(stored[SESSION_INTERVAL_KEY]);
-    let start = startAt;
+    let start = Math.max(startAt,migrationAt);
     const currentWeek = new Set(currentWeekDayKeys());
     while (start < endAt) {
       const date = new Date(start);
@@ -108,7 +121,10 @@ function queueSessionInterval(startAt, endAt) {
       }
       start = end;
     }
-    await chrome.storage.local.set({[SESSION_INTERVAL_KEY]:pruneSessionIntervals(map)});
+    await chrome.storage.local.set({
+      [SESSION_INTERVAL_KEY]:pruneSessionIntervals(map),
+      [SESSION_MIGRATION_KEY]:{at:migrationAt,legacy:pruneDayMap(baseline)}
+    });
   }).catch(()=>{});
   return statsWriteChain;
 }
@@ -119,7 +135,13 @@ function queueActiveUsage(dayKey, seconds) {
     return statsWriteChain;
   }
   statsWriteChain = statsWriteChain.then(async () => {
-    const stored = await chrome.storage.local.get({[ACTIVE_USAGE_KEY]:{}});
+    const stored = await chrome.storage.local.get({
+      [ACTIVE_USAGE_KEY]:{},
+      [SESSION_MIGRATION_KEY]:null
+    });
+    // Ignore legacy heartbeats after the interval tracker has taken over;
+    // keep the snapshot captured during migration rather than counting twice.
+    if (stored[SESSION_MIGRATION_KEY]) return;
     const map = pruneDayMap(stored[ACTIVE_USAGE_KEY]);
     // Ignore delayed previous-week heartbeats after Monday's reset.
     if (!currentWeekDayKeys().includes(dayKey) || dayKey > localDayKey()) return;
@@ -174,12 +196,17 @@ async function usageDaysSnapshot() {
       const old = await chrome.storage.local.get({
         [ACTIVE_USAGE_KEY]:{},
         [WEEKLY_USAGE_KEY]:{},
-        [SESSION_INTERVAL_KEY]:{}
+        [SESSION_INTERVAL_KEY]:{},
+        [SESSION_MIGRATION_KEY]:null
       });
+      const migrated = old[SESSION_MIGRATION_KEY];
       await chrome.storage.local.set({
         [ACTIVE_USAGE_KEY]:pruneDayMap(old[ACTIVE_USAGE_KEY]),
         [WEEKLY_USAGE_KEY]:pruneDayMap(old[WEEKLY_USAGE_KEY]),
-        [SESSION_INTERVAL_KEY]:pruneSessionIntervals(old[SESSION_INTERVAL_KEY])
+        [SESSION_INTERVAL_KEY]:pruneSessionIntervals(old[SESSION_INTERVAL_KEY]),
+        [SESSION_MIGRATION_KEY]:migrated && Number.isFinite(migrated.at)
+          ? {at:migrated.at,legacy:pruneDayMap(migrated.legacy)}
+          : null
       });
     }).catch(() => {});
     lastPrunedWeek = week;
@@ -189,9 +216,12 @@ async function usageDaysSnapshot() {
   const stored = await chrome.storage.local.get({
     [ACTIVE_USAGE_KEY]:{},
     [WEEKLY_USAGE_KEY]:{},
-    [SESSION_INTERVAL_KEY]:{}
+    [SESSION_INTERVAL_KEY]:{},
+    [SESSION_MIGRATION_KEY]:null
   });
-  const active = pruneDayMap(stored[ACTIVE_USAGE_KEY]);
+  const migration = stored[SESSION_MIGRATION_KEY];
+  const active = migration?.legacy ? pruneDayMap(migration.legacy) :
+    pruneDayMap(stored[ACTIVE_USAGE_KEY]);
   const quota = pruneDayMap(stored[WEEKLY_USAGE_KEY]);
   const intervals = pruneSessionIntervals(stored[SESSION_INTERVAL_KEY]);
   return currentWeekDayKeys().map(day => ({
