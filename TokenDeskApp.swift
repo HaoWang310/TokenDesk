@@ -1,8 +1,9 @@
 import AppKit
 import SwiftUI
 import Combine
+import UserNotifications
 
-// TokenDesk v1.7.5 monitors quota plus currently running ChatGPT web tasks.
+// TokenDesk v1.7.6 monitors quota, running ChatGPT web tasks, and quota alerts.
 // Data path: Chrome extension -> loopback BrowserBridge -> quota history + live task state.
 // There is no Codex CLI process launch, ~/.codex log scan, token accounting,
 // Admin Usage API key, or background Codex polling in this build.
@@ -87,6 +88,79 @@ private struct LastQuotaCache: Codable {
     static func save(_ usage: BrowserUsage) {
         guard let data = try? JSONEncoder().encode(LastQuotaCache(usage)) else { return }
         UserDefaults.standard.set(data, forKey: key)
+    }
+}
+
+private final class QuotaAlertManager {
+    static let shared = QuotaAlertManager()
+    static let threshold = 20
+
+    private let center = UNUserNotificationCenter.current()
+    private let defaults = UserDefaults.standard
+
+    private init() {}
+
+    func requestAuthorization() {
+        center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    func process(_ snapshot: QuotaSnapshot, now: Date = Date()) {
+        processWindow(kind: "five",
+                      label: "5小时",
+                      window: snapshot.fiveHour,
+                      now: now)
+        processWindow(kind: "weekly",
+                      label: "每周",
+                      window: snapshot.weekly,
+                      now: now)
+    }
+
+    private func processWindow(kind: String, label: String, window: QuotaWindow?, now: Date) {
+        guard let window = window else { return }
+
+        let cycleKey: String
+        if let reset = window.resetsAt {
+            cycleKey = String(Int(reset.timeIntervalSince1970))
+            scheduleReset(kind: kind, label: label, at: reset, now: now)
+        } else {
+            let duration = max(60, (window.windowDurationMinutes ?? 300) * 60)
+            cycleKey = "fallback-" + String(Int(now.timeIntervalSince1970) / duration)
+        }
+
+        let lowKey = "TokenDeskAlertLowCycle_" + kind
+        if window.remainingPercent <= Self.threshold &&
+           defaults.string(forKey: lowKey) != cycleKey {
+            let resetText = window.resetsAt.map {
+                "，预计 " + DateFormatter.localizedString(from: $0, dateStyle: .none, timeStyle: .short) + " 刷新"
+            } ?? ""
+            notify(identifier: "tokendesk.low." + kind + "." + cycleKey,
+                   title: "TokenDesk · " + label + "额度剩余20%或以下",
+                   body: "当前剩余 " + String(window.remainingPercent) + "%" + resetText + "。")
+            defaults.set(cycleKey, forKey: lowKey)
+        }
+    }
+
+    private func scheduleReset(kind: String, label: String, at date: Date, now: Date) {
+        let identifier = "tokendesk.reset." + kind
+        center.removePendingNotificationRequests(withIdentifiers: [identifier])
+        guard date.timeIntervalSince(now) > 2 else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "TokenDesk · " + label + "额度已刷新"
+        content.body = "新的" + label + "额度周期已经开始。"
+        content.sound = .default
+
+        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: trigger))
+    }
+
+    private func notify(identifier: String, title: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
     }
 }
 
@@ -188,6 +262,7 @@ private final class TokenModel: ObservableObject {
         freshnessClock = Date()
         LastQuotaCache.save(value)
         recordQuotaHistory(value.snapshot, at: value.observedAt)
+        QuotaAlertManager.shared.process(value.snapshot, now: value.observedAt)
         browserBridgeState = "已读取\(value.sourceLabel)数据：" + value.observedAt.formatted(date: .omitted, time: .standard)
     }
 
@@ -783,7 +858,7 @@ private struct TokenDeskSettingsView: View {
                 .font(.system(size: 11))
                 .foregroundColor(.white.opacity(0.58))
                 .fixedSize(horizontal: false, vertical: true)
-            Text("v1.7.5 通用安装版：同一套源码安装包适配 Intel x86_64 与 Apple Silicon arm64，最低 macOS 12，并兼容 Swift 5.5+ 工具链。")
+            Text("v1.7.6 新增额度提醒：5小时/每周剩余20%或以下提醒，并在对应额度刷新时发送系统通知。")
                 .font(.system(size: 10.5))
                 .foregroundColor(.white.opacity(0.43))
                 .fixedSize(horizontal: false, vertical: true)
@@ -887,7 +962,7 @@ private final class DesktopPanel: NSPanel {
 }
 
 @MainActor
-private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {
     private let model = TokenModel()
     private var freshnessTimer: Timer?
     private var panel: DesktopPanel!
@@ -904,6 +979,8 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        UNUserNotificationCenter.current().delegate = self
+        QuotaAlertManager.shared.requestAuthorization()
         let startupFrame = resolvedPanelFrame(restorePosition: true)
         model.panelHeight = startupFrame.height
         panel = DesktopPanel(contentRect: startupFrame,
@@ -989,6 +1066,12 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
     @objc private func refreshFreshnessState() {
         model.refreshFreshnessClock()
         updateMenuBar()
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
     }
 
     private func makeTokenDeskMenuBarIcon() -> NSImage {
