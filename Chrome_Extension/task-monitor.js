@@ -254,27 +254,23 @@
   }
 
   function activePhase() {
-    // Prefer explicit visible status text so “正在思考” is distinguished from “正在工作”.
-    for (const el of document.querySelectorAll('[role="status"],[aria-live="polite"],[aria-live="assertive"]')) {
-      if (!visible(el)) continue;
-      const phase = phaseFromText(el.textContent);
-      if (phase) return phase;
-    }
-
-    for (const el of document.querySelectorAll('span,p,div')) {
-      if (!visible(el)) continue;
-      if (el.closest('textarea,[contenteditable="true"],[data-message-author-role="user"],nav,aside,[role="navigation"],[role="menu"],[data-testid*="sidebar"],[data-testid*="menu"]')) continue;
-      if (el.children.length > 3) continue;
-      const text = clean(el.textContent);
-      if (text.length === 0 || text.length > 40) continue;
-      const phase = phaseFromText(text);
-      if (phase) return phase;
-    }
-
-    // A real Stop control is still a strong active-task signal, but generic
-    // data-testid/data-state "working/running" markers are intentionally ignored:
-    // ChatGPT can keep those markers on idle Work-mode UI.
+    // A visible enabled Stop control is positive evidence that a response is
+    // still executing. The model or Work mode selected in a toolbar is NOT.
     if (hasActiveControl()) return 'working';
+
+    // Live progress can also be text-only, but it must belong to the CURRENT
+    // assistant message rather than navigation, a mode picker or scrollback.
+    const assistantMessages = [...document.querySelectorAll('[data-message-author-role="assistant"]')];
+    const latest = assistantMessages[assistantMessages.length - 1];
+    if (latest) {
+      for (const el of latest.querySelectorAll('[role="status"],[aria-live="polite"],[aria-live="assertive"]')) {
+        if (!visible(el) || el.closest('[role="menu"],button,[role="button"]')) continue;
+        const phase = phaseFromText(el.textContent);
+        if (phase) return phase;
+      }
+    }
+    // Do not scan every div/span/p for words like "Working" or "正在工作".
+    // These often describe the selected mode long after a task finished.
     return null;
   }
 
@@ -396,6 +392,7 @@
       payload:{
         id:conversationID(),
         active:false,
+        unverified:wasActive,
         phase:phase || 'working',
         model:lastModel || currentModelLabel() || '',
         title:safeTitle(),
