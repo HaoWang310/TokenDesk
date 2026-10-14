@@ -455,5 +455,6 @@
     globalThis.__TOKEN_DESK_TASK_TEST_CURRENT_MODEL__ = currentModelLabel;
     globalThis.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__ = modelDiagnostic;
     globalThis.__TOKEN_DESK_TASK_TEST_ACTIVE_PHASE__ = activePhase;
+    globalThis.__TOKEN_DESK_TASK_TEST_SEND__ = sendState;
   }
 })();
