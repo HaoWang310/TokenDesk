@@ -22,6 +22,9 @@ assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_STATUS__('finished'),false);
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTION__('Stop generating'),true);
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTION__('停止任务'),true);
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTION__('Cancel'),false);
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_MODEL__('GPT-5.6 Sol'),'GPT-5.6 Sol');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_MODEL__('Model: GPT-5.6 Thinking'),'GPT-5.6 Thinking');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_MODEL__('ChatGPT'),null);
 
 // Regression: generic Work-mode/running DOM markers must not be treated as proof
 // that a ChatGPT task is actively running.
