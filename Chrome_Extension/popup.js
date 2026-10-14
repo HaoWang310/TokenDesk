@@ -95,6 +95,8 @@ document.getElementById('model-check').addEventListener('click', () => {
         } else {
           lines.push('  网络监听脚本：未连接，请确认 v1.8.12 已加载，并刷新 ChatGPT 页面');
         }
+        lines.push('  当前对话网络流：' + (item.streamOpen ? '正在接收（运行依据）' :
+          item.streamTerminalSeen ? '已结束' : '未确认'));
         lines.push('  网络 conversation 请求：' + (item.conversationFetchSeen || 0) +
           ' · SSE 流：' + (item.streamSeen || 0) +
           ' · 最新状态：' + (item.lastStreamStatus || 'not-observed'));
