@@ -84,6 +84,8 @@
           const label = normalizeModelLabel(value);
           if (!label) continue;
           if (!label.startsWith('模式：')) return label;
+          // The generic header popup may be another tool/settings menu.
+          if (selector === 'header button[aria-haspopup="menu"]') continue;
           if (!modeOnly) modeOnly = label;
         }
       }
