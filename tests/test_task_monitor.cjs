@@ -62,7 +62,7 @@ pill=fakeNode('6Pro');
 checked=fakeNode('GPT-6 Pro');
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_CURRENT_MODEL__(),'GPT-6 Pro');
 const report=sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__();
-assert.strictEqual(report.scriptVersion,'1.8.6');
+assert.strictEqual(report.scriptVersion,'1.8.8');
 assert.strictEqual(report.reason,'recognized');
 assert.strictEqual(report.model,'GPT-6 Pro');
 assert.strictEqual(report.pickerCount,1);
@@ -90,6 +90,12 @@ assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTIVE_PHASE__(),'working');
 sandbox.document.querySelectorAll=()=>[];
 
 assert.strictEqual(typeof windowListeners.message,'function');
+windowListeners.message({source:pageWindow,origin:'https://chatgpt.com',
+  data:{channel:'TOKEN_DESK_NETWORK_V1',type:'MODEL_TRACE',status:'conversation-fetch-seen'}});
+windowListeners.message({source:pageWindow,origin:'https://chatgpt.com',
+  data:{channel:'TOKEN_DESK_NETWORK_V1',type:'MODEL_TRACE',status:'stream-observed'}});
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().conversationFetchSeen,1);
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().streamSeen,1);
 windowListeners.message({
   source:pageWindow,origin:'https://chatgpt.com',
   data:{channel:'TOKEN_DESK_NETWORK_V1',type:'MODEL',source:'resolved_model_slug',model:'gpt-6-thinking'}
@@ -98,6 +104,7 @@ const latest=messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1);
 assert(latest && latest.payload.model==='gpt-6-thinking','stream model must reach task snapshot');
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().modelSource,'resolved_model_slug');
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().model,'gpt-6-thinking');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().lastStreamStatus,'model-found');
 // A different SPA conversation must not inherit the prior model.
 sandbox.location.pathname='/c/another';
 sandbox.location.href='https://chatgpt.com/c/another';
