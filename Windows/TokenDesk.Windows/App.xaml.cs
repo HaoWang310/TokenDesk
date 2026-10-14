@@ -21,6 +21,8 @@ public partial class App : System.Windows.Application
         _window = new MainWindow(_store);
         MainWindow = _window;
 
+        CreateTray();
+
         _bridge = new LocalBridge(_store.PairingCode);
         _bridge.StateChanged += state => Dispatcher.Invoke(() =>
         {
@@ -29,7 +31,8 @@ public partial class App : System.Windows.Application
         });
         _bridge.QuotaReceived += quota => Dispatcher.Invoke(() =>
         {
-            _store.SetQuota(quota);
+            var alerts = _store.SetQuota(quota);
+            foreach (var alert in alerts) ShowQuotaAlert(alert);
             _window?.RefreshFromStore();
             UpdateTray();
         });
@@ -40,8 +43,6 @@ public partial class App : System.Windows.Application
             UpdateTray();
         });
         _bridge.Start();
-
-        CreateTray();
 
         var startHidden = e.Args.Any(a => string.Equals(a, "--tray", StringComparison.OrdinalIgnoreCase));
         if (!startHidden)
@@ -75,6 +76,15 @@ public partial class App : System.Windows.Application
         {
             if (args.Button == Forms.MouseButtons.Left) ShowWindow();
         };
+    }
+
+    private void ShowQuotaAlert(QuotaAlertEvent alert)
+    {
+        if (_trayIcon == null) return;
+        _trayIcon.BalloonTipTitle = alert.Title;
+        _trayIcon.BalloonTipText = alert.Message;
+        _trayIcon.BalloonTipIcon = Forms.ToolTipIcon.Info;
+        _trayIcon.ShowBalloonTip(8000);
     }
 
     private void ShowWindow()
