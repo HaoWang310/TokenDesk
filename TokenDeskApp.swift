@@ -923,8 +923,8 @@ private struct WeeklyUsageSection: View {
             }
 
             HStack(spacing: 9) {
-                metric(title: "今天前台使用时间", value: durationText(today?.activeSeconds ?? 0))
-                metric(title: "本周前台累计", value: durationText(totalSeconds))
+                metric(title: "今天总使用时长", value: durationText(today?.activeSeconds ?? 0))
+                metric(title: "本周总使用时长", value: durationText(totalSeconds))
             }
 
             barCard(title: "每日使用时间",
@@ -937,7 +937,7 @@ private struct WeeklyUsageSection: View {
                     labels: calendarWeekDays.map { dayLabel($0.day) },
                     valueText: { "\(Int($0))%" })
 
-            Text("“使用时间”= Chrome 的 ChatGPT 标签页可见、拥有焦点且最近 5 分钟内有交互的时间，每约 10 秒同步一次，显示精确到秒。打开 TokenDesk 或其他窗口后会暂停累计；模型在后台运行的时间单独在任务列表显示。“每日用量”= 每周剩余额度当日下降的百分点，不是 Token 数。本周用量累计：\(totalQuota) 个百分点。统计从每周一 00:00 开始，旧周记录不计入本周；不影响 ChatGPT 官方额度刷新。")
+            Text("“GPT 总使用时长”= ChatGPT 网页前台活跃使用时间 + 已确认的后台 Thinking / Working 任务时间，重叠只计一次。每约 10 秒同步；只有闲置网页、已关闭后状态待确认的任务以及未监控的 ChatGPT 桌面应用不会继续计时。“每日用量”= 每周剩余额度当日下降的百分点，不是 Token 数。本周用量累计：\(totalQuota) 个百分点。统计从每周一 00:00 开始，旧周记录不计入本周；不影响 ChatGPT 官方额度刷新。")
                 .font(.system(size: 9.2))
                 .foregroundColor(.white.opacity(0.38))
                 .fixedSize(horizontal: false, vertical: true)
