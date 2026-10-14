@@ -27,10 +27,24 @@ public sealed class RunningTaskState
 {
     public string Id { get; set; } = "";
     public TaskPhase Phase { get; set; }
+    public string ModelName { get; set; } = "";
     public string Title { get; set; } = "ChatGPT 任务";
     public string PageUrl { get; set; } = "";
     public DateTimeOffset StartedAt { get; set; }
     public DateTimeOffset LastSeenAt { get; set; }
+}
+
+public sealed class DailyUsageState
+{
+    public string Day { get; set; } = "";
+    public int ActiveSeconds { get; set; }
+    public int WeeklyQuotaUsed { get; set; }
+}
+
+public sealed class TaskSnapshotState
+{
+    public List<RunningTaskState> Tasks { get; set; } = new();
+    public List<DailyUsageState> UsageDays { get; set; } = new();
 }
 
 public sealed class HistoryPoint
