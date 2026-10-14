@@ -49,6 +49,28 @@ function sendTask(active){
   assert.strictEqual(badRet,false);
   await new Promise(r=>setTimeout(r,250));
   assert.strictEqual(lastTaskBody.usageDays.find(d=>d.day===day).activeSeconds,10);
+  // Foreground use and background Thinking/Working describe wall-clock
+  // intervals. Two tabs reporting the same interval must count ONCE.
+  const endAt = Date.now()-1000, startAt=endAt-10000;
+  const sendInterval=(tabId,start,end,reason)=>{
+    let answer=null;
+    const returned=receiver({type:'TOKEN_DESK_SESSION_INTERVAL',payload:{
+      startAt:start,endAt:end,reason
+    }},{url:'https://chatgpt.com/c/test',tab:{id:tabId}},r=>answer=r);
+    assert.strictEqual(returned,false); assert(answer&&answer.ok);
+  };
+  sendInterval(7,startAt,endAt,'foreground');
+  sendInterval(8,startAt,endAt,'task');
+  await new Promise(r=>setTimeout(r,300));
+  const afterOverlap=lastTaskBody.usageDays.find(d=>d.day===day).activeSeconds;
+  assert(afterOverlap>=19 && afterOverlap<=21,
+    'overlapping foreground and task time must only add one 10s interval');
+  sendInterval(7,startAt-10000,startAt,'task');
+  await new Promise(r=>setTimeout(r,300));
+  const afterAdjacent=lastTaskBody.usageDays.find(d=>d.day===day).activeSeconds;
+  assert(afterAdjacent>=29 && afterAdjacent<=31,
+    'a nonoverlapping 10s task interval must add 10s to the daily total');
+
   let diagnostics=null;
   const ret=receiver({type:'TOKEN_DESK_DIAGNOSE_MODELS'},{},r=>diagnostics=r);
   assert.strictEqual(ret,true);
