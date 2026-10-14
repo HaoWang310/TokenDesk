@@ -22,4 +22,10 @@ assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_STATUS__('finished'),false);
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTION__('Stop generating'),true);
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTION__('停止任务'),true);
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTION__('Cancel'),false);
+
+// Regression: generic Work-mode/running DOM markers must not be treated as proof
+// that a ChatGPT task is actively running.
+assert.strictEqual(src.includes('[data-testid*="working"]'), false, 'idle Work-mode UI markers must not trigger working');
+assert.strictEqual(src.includes('[data-testid*="running"]'), false, 'generic running testids must not trigger working');
+assert.strictEqual(src.includes('button[data-testid*="stop"][aria-label]'), false, 'broad stop selector must stay removed');
 console.log('PASS task-monitor');
