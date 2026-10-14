@@ -41,5 +41,12 @@ assert.equal(parse({resolved_model_slug:'gpt-6-thinking',content:'should not be 
   await window.fetch('https://chatgpt.com/api/other',{method:'POST'});
   await new Promise(resolve=>setTimeout(resolve,40));
   assert.equal(messages.filter(m=>m.type==='MODEL').length,before);
+  await window.fetch('https://chatgpt.com/backend-api/f/conversation',
+    {method:'POST',body:JSON.stringify({model:'gpt-6-thinking',prompt:'private'})});
+  const requestedSignals=messages.filter(m=>m.type==='REQUEST_MODEL');
+  assert.equal(requestedSignals.length,1);
+  assert.equal(requestedSignals[0].model,'gpt-6-thinking');
+  assert(!JSON.stringify(requestedSignals).includes('private'),
+    'the request prompt must not be forwarded');
   console.log('PASS resolved_model_slug stream extraction and model-only forwarding');
 })().catch(error=>{console.error(error);process.exitCode=1;});
