@@ -189,7 +189,8 @@ public sealed class AppStore
         lock (_gate)
         {
             _tasks = snapshot.Tasks
-                .Where(t => DateTimeOffset.UtcNow - t.LastSeenAt < TimeSpan.FromSeconds(90))
+                .Where(t => DateTimeOffset.UtcNow - t.LastSeenAt < (t.Phase == TaskPhase.Unverified
+                    ? TimeSpan.FromHours(2) : TimeSpan.FromSeconds(90)))
                 .OrderBy(t => t.StartedAt)
                 .Take(32)
                 .ToList();
