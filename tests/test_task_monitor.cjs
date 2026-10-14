@@ -62,7 +62,7 @@ pill=fakeNode('6Pro');
 checked=fakeNode('GPT-6 Pro');
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_CURRENT_MODEL__(),'GPT-6 Pro');
 const report=sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__();
-assert.strictEqual(report.scriptVersion,'1.8.11');
+assert.strictEqual(report.scriptVersion,'1.8.12');
 assert.strictEqual(report.reason,'recognized');
 assert.strictEqual(report.model,'GPT-6 Pro');
 assert.strictEqual(report.pickerCount,1);
@@ -90,6 +90,11 @@ assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTIVE_PHASE__(),'working');
 sandbox.document.querySelectorAll=()=>[];
 
 assert.strictEqual(typeof windowListeners.message,'function');
+windowListeners.message({source:pageWindow,origin:'https://chatgpt.com',
+  data:{channel:'TOKEN_DESK_NETWORK_V1',type:'HOOK_STATUS',
+    hookVersion:'1.8.12',fetchWrapped:true}});
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().hookStatus,'connected');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().hookFetchActive,true);
 windowListeners.message({source:pageWindow,origin:'https://chatgpt.com',
   data:{channel:'TOKEN_DESK_NETWORK_V1',type:'REQUEST_MODEL',source:'request_body',model:'gpt-6-thinking'}});
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().modelSource,'request_body');
