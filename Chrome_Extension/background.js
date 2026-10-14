@@ -365,6 +365,8 @@ async function diagnoseOpenModelPickers() {
         activeTask: result.activeTask === true,
         model: String(result.model || '').slice(0, 64),
         lastModel: String(result.lastModel || '').slice(0, 64),
+        modelSource: result.modelSource === 'resolved_model_slug' ? 'resolved_model_slug'
+          : 'page-selector',
         pickerCount: Math.max(0, Math.min(12, Number(result.pickerCount) || 0)),
         visiblePickerCount: Math.max(0, Math.min(12, Number(result.visiblePickerCount) || 0)),
         recognizedPills: Array.isArray(result.recognizedPills)
