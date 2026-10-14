@@ -3,7 +3,7 @@ import SwiftUI
 import Combine
 import UserNotifications
 
-// TokenDesk v1.8.0 monitors quota, running ChatGPT web tasks, and quota alerts.
+// TokenDesk v1.8.1 monitors quota, running ChatGPT web tasks, and quota alerts.
 // Data path: Chrome extension -> loopback BrowserBridge -> quota history + live task state.
 // There is no Codex CLI process launch, ~/.codex log scan, token accounting,
 // Admin Usage API key, or background Codex polling in this build.
@@ -98,7 +98,16 @@ private final class QuotaAlertManager {
     private let center = UNUserNotificationCenter.current()
     private let defaults = UserDefaults.standard
 
-    private init() {}
+    private init() {
+        // v1.8.0 scheduled reset notifications ahead of time and re-created
+        // them whenever a fresh quota reading arrived. Remove those legacy
+        // pending requests so an upgraded installation cannot receive a
+        // duplicate reset banner from the old scheduling model.
+        center.removePendingNotificationRequests(withIdentifiers: [
+            "tokendesk.reset.five",
+            "tokendesk.reset.weekly"
+        ])
+    }
 
     func requestAuthorization() {
         center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
@@ -118,41 +127,94 @@ private final class QuotaAlertManager {
     private func processWindow(kind: String, label: String, window: QuotaWindow?, now: Date) {
         guard let window = window else { return }
 
-        let cycleKey: String
-        if let reset = window.resetsAt {
-            cycleKey = String(Int(reset.timeIntervalSince1970))
-            scheduleReset(kind: kind, label: label, at: reset, now: now)
-        } else {
-            let duration = max(60, (window.windowDurationMinutes ?? 300) * 60)
-            cycleKey = "fallback-" + String(Int(now.timeIntervalSince1970) / duration)
+        let prefix = "TokenDeskAlertState_v2_" + kind + "_"
+        let initializedKey = prefix + "initialized"
+        let anchorKey = prefix + "cycleAnchor"
+        let lowShownKey = prefix + "lowShown"
+        let resetShownKey = prefix + "resetShownCycle"
+        let lastRemainingKey = prefix + "lastRemaining"
+
+        let duration = TimeInterval(max(60, (window.windowDurationMinutes ?? 300) * 60))
+        let currentAnchor = window.resetsAt?.timeIntervalSince1970
+        let previousAnchor = defaults.object(forKey: anchorKey) as? Double
+        let previousRemaining = defaults.object(forKey: lastRemainingKey) as? Int
+        let initialized = defaults.bool(forKey: initializedKey)
+
+        // The reset timestamp is normally stable throughout one quota cycle.
+        // Ignore small timestamp corrections and only treat a large forward
+        // movement as a genuinely new cycle. This prevents a slightly changing
+        // server/browser timestamp from repeatedly re-arming alerts.
+        var cycleChanged = false
+        if initialized, let currentAnchor, let previousAnchor {
+            let forwardShift = currentAnchor - previousAnchor
+            cycleChanged = forwardShift > max(120, duration * 0.5)
         }
 
-        let lowKey = "TokenDeskAlertLowCycle_" + kind
-        if window.remainingPercent <= Self.threshold &&
-           defaults.string(forKey: lowKey) != cycleKey {
+        // Fallback for readings where resetAt is temporarily absent or unchanged:
+        // a large jump from a depleted quota to a replenished quota is also a
+        // strong signal that a new cycle has begun.
+        if initialized, !cycleChanged,
+           let previousRemaining,
+           previousRemaining <= 30,
+           window.remainingPercent >= 70,
+           window.remainingPercent - previousRemaining >= 40 {
+            cycleChanged = true
+        }
+
+        if !initialized {
+            defaults.set(true, forKey: initializedKey)
+            if let currentAnchor { defaults.set(currentAnchor, forKey: anchorKey) }
+
+            // Preserve the old v1.8.0 low-quota latch during migration so users
+            // who already dismissed a <=20% alert do not immediately see it again.
+            if let reset = window.resetsAt {
+                let legacyCycle = String(Int(reset.timeIntervalSince1970))
+                let legacyKey = "TokenDeskAlertLowCycle_" + kind
+                if defaults.string(forKey: legacyKey) == legacyCycle {
+                    defaults.set(true, forKey: lowShownKey)
+                }
+            }
+        } else if cycleChanged {
+            let cycleToken = currentAnchor ?? now.timeIntervalSince1970
+
+            // A new quota cycle unlocks exactly one reset alert and one future
+            // <=20% alert. The reset alert is sent only after the new cycle is
+            // actually observed, never repeatedly scheduled in advance.
+            let lastResetShown = defaults.object(forKey: resetShownKey) as? Double
+            if lastResetShown == nil || abs((lastResetShown ?? 0) - cycleToken) > 1 {
+                notify(identifier: "tokendesk.reset." + kind + "." + String(Int(cycleToken)),
+                       title: "TokenDesk · " + label + "额度已刷新",
+                       body: "新的" + label + "额度周期已经开始。")
+                defaults.set(cycleToken, forKey: resetShownKey)
+            }
+
+            defaults.set(false, forKey: lowShownKey)
+            if let currentAnchor {
+                defaults.set(currentAnchor, forKey: anchorKey)
+            } else {
+                defaults.removeObject(forKey: anchorKey)
+            }
+        } else if previousAnchor == nil, let currentAnchor {
+            // Better data becoming available is not itself a reset.
+            defaults.set(currentAnchor, forKey: anchorKey)
+        }
+
+        // Low-quota alert is a persistent per-cycle latch. Once dismissed, the
+        // app will not post it again until a real quota reset re-arms the latch.
+        if window.remainingPercent <= Self.threshold && !defaults.bool(forKey: lowShownKey) {
             let resetText = window.resetsAt.map {
                 "，预计 " + DateFormatter.localizedString(from: $0, dateStyle: .none, timeStyle: .short) + " 刷新"
             } ?? ""
-            notify(identifier: "tokendesk.low." + kind + "." + cycleKey,
+            let cycleToken = (defaults.object(forKey: anchorKey) as? Double)
+                ?? currentAnchor
+                ?? now.timeIntervalSince1970
+            notify(identifier: "tokendesk.low." + kind + "." + String(Int(cycleToken)),
                    title: "TokenDesk · " + label + "额度剩余20%或以下",
                    body: "当前剩余 " + String(window.remainingPercent) + "%" + resetText + "。")
-            defaults.set(cycleKey, forKey: lowKey)
+            defaults.set(true, forKey: lowShownKey)
         }
-    }
 
-    private func scheduleReset(kind: String, label: String, at date: Date, now: Date) {
-        let identifier = "tokendesk.reset." + kind
-        center.removePendingNotificationRequests(withIdentifiers: [identifier])
-        guard date.timeIntervalSince(now) > 2 else { return }
-
-        let content = UNMutableNotificationContent()
-        content.title = "TokenDesk · " + label + "额度已刷新"
-        content.body = "新的" + label + "额度周期已经开始。"
-        content.sound = .default
-
-        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: trigger))
+        defaults.set(window.remainingPercent, forKey: lastRemainingKey)
     }
 
     private func notify(identifier: String, title: String, body: String) {
@@ -985,7 +1047,7 @@ private struct TokenDeskSettingsView: View {
                 .font(.system(size: 11))
                 .foregroundColor(.white.opacity(0.58))
                 .fixedSize(horizontal: false, vertical: true)
-            Text("v1.8.0 新增额度提醒：5小时/每周剩余20%或以下提醒，并在对应额度刷新时发送系统通知。")
+            Text("v1.8.1 额度提醒：每个5小时/每周周期的20%提醒和刷新提醒都最多弹出一次；关闭后本周期不再重复，下一次真实刷新后重新解锁。")
                 .font(.system(size: 10.5))
                 .foregroundColor(.white.opacity(0.43))
                 .fixedSize(horizontal: false, vertical: true)
