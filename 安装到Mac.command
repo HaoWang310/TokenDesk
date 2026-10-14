@@ -1,5 +1,5 @@
 #!/bin/bash
-# Token Desk 1.7.6 -- native macOS installer
+# Token Desk 1.7.7 -- native macOS installer
 # Builds locally, installs into ~/Applications, clears quarantine/provenance,
 # ad-hoc signs in the final location, then launches the executable directly.
 set -Eeuo pipefail
@@ -32,7 +32,7 @@ cleanup() {
 trap cleanup EXIT
 
 printf '\n╔═══════════════════════════════════════════════╗\n'
-printf '║          TOKEN DESK · macOS 安装器 v1.7.6      ║\n'
+printf '║          TOKEN DESK · macOS 安装器 v1.7.7      ║\n'
 printf '╚═══════════════════════════════════════════════╝\n\n'
 SYSTEM_VERSION="$(sw_vers -productVersion)"
 MACHINE_ARCH="$(uname -m)"
@@ -77,7 +77,7 @@ if [[ -n "$SWIFT_VERSION" ]]; then
   SWIFT_MINOR="${SWIFT_VERSION#*.}"
   if (( SWIFT_MAJOR < 5 || (SWIFT_MAJOR == 5 && SWIFT_MINOR < 5) )); then
     echo "Swift 编译器过旧：$SWIFT_LINE"
-    echo 'TokenDesk v1.7.6 需要 Swift 5.5 或更新版本，请更新 Xcode Command Line Tools。'
+    echo 'TokenDesk v1.7.7 需要 Swift 5.5 或更新版本，请更新 Xcode Command Line Tools。'
     exit 9
   fi
 fi
