@@ -149,7 +149,7 @@ public partial class MainWindow : Window
         TodayActiveText.Text = DurationText(today?.ActiveSeconds ?? 0);
         WeekActiveText.Text = DurationText(totalSeconds);
         WeekQuotaTotalText.Text =
-            $"本周用量累计：{totalQuota} 个百分点 · 统计周期 {monday:MM/dd}–{monday.AddDays(6):MM/dd}（每周一 00:00 清零）。使用时间仅统计 Chrome/Edge 中前台活跃的 ChatGPT 网页；安装前历史不会补录。用量不是 Token 数，也不会改变官方额度重置时间。";
+            $"本周用量累计：{totalQuota} 个百分点 · 统计周期 {monday:MM/dd}–{monday.AddDays(6):MM/dd}（每周一 00:00 清零）。使用时间每约 10 秒由扩展上报，精确到秒；只在 Chrome/Edge 的 ChatGPT 网页可见、拥有焦点且最近 5 分钟有交互时累计。切换到本窗口或其他程序会暂停，后台模型运行时长不计入实际使用时间。安装前历史无法补录；不会改变官方额度。";
 
         DrawBarChart(ActiveUsageCanvas, days,
             d => d.ActiveSeconds,
@@ -257,11 +257,12 @@ public partial class MainWindow : Window
 
     private static string DurationText(int seconds)
     {
-        if (seconds <= 0) return "0分";
-        if (seconds < 60) return "不足1分";
-        var minutes = seconds / 60;
-        if (minutes < 60) return $"{minutes}分";
-        return $"{minutes / 60}时{minutes % 60}分";
+        // Report actual received seconds, not floored whole minutes.
+        // Time may legitimately pause when the ChatGPT browser tab loses focus.
+        if (seconds <= 0) return "0秒";
+        if (seconds < 60) return $"{seconds}秒";
+        if (seconds < 3600) return $"{seconds / 60}分{seconds % 60:D2}秒";
+        return $"{seconds / 3600}时{(seconds % 3600) / 60:D2}分{seconds % 60:D2}秒";
     }
 
     private void DrawHistory()
