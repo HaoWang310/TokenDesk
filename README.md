@@ -1,12 +1,12 @@
 # TokenDesk
 
-A lightweight macOS menu-bar monitor for **ChatGPT Work / Codex usage limits**.
+A lightweight **macOS + Windows** monitor for **ChatGPT Work / Codex usage limits**.
 
 > **Unofficial project.** TokenDesk is not affiliated with or endorsed by OpenAI. It relies on ChatGPT web behavior/internal endpoints that may change without notice.
 
 ## What it does
 
-TokenDesk keeps a small macOS menu-bar panel showing:
+TokenDesk shows quota and running-task status on macOS and Windows:
 
 - 5-hour remaining usage quota
 - weekly remaining usage quota
@@ -39,7 +39,25 @@ v1.7.5 adds macOS 12 Monterey / Intel x86_64 local-build compatibility and fixes
 - local macOS build/install flow
 - adaptive macOS menu-bar icon
 
+## Windows v1.0.0
+
+The Windows version is under `Windows/` and is built with **.NET 8 + WPF**.
+
+- Windows 10 2004 (19041) or later
+- Windows 11 recommended
+- `win-x64` for standard Intel / AMD PCs
+- `win-arm64` for Windows on ARM
+- self-contained build: no separate .NET installation required
+- system tray resident app
+- 5-hour / weekly quota, reset times and 7-day local history
+- running-task monitor with separate **Thinking / Working** counts
+- Chrome and Edge can load the bundled Chromium extension
+- loopback bridge remains bound to `127.0.0.1:18743`
+
+GitHub Actions automatically builds both Windows architectures. See [Windows/README.md](Windows/README.md).
+
 ## Install
+
 
 ### 1. Download the repository
 
@@ -100,6 +118,7 @@ The extension has host access to ChatGPT so it can query the usage endpoint usin
 
 ```text
 TokenDeskApp.swift                 macOS SwiftUI/AppKit UI
+Windows/                           Windows .NET 8 / WPF app
 BrowserBridge.swift                loopback Chrome → Mac bridge
 BrowserUsage.swift                 sanitized quota parsing
 QuotaModels.swift                  quota models
@@ -116,7 +135,7 @@ README_中文.md                     Chinese documentation
 
 ## Requirements
 
-- macOS 13 or later
+- macOS 12 Monterey or later (Mac version)
 - Google Chrome
 - an active ChatGPT login in Chrome
 - Apple Command Line Tools / Swift compiler for the local build
