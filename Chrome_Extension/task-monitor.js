@@ -31,7 +31,7 @@
     'header button[aria-haspopup="menu"]'
   ];
   const explicitModelHint = /(?:\bGPT[-\s]?\d|\bo[134](?:[-\s]|$)|\bCodex\b)/i;
-  const bareModeHint = /^(?:instant|thinking|pro|auto|medium|high|extra high|very high|extended|pro extended|fast|balanced|standard|极速|快速|均衡|自动|思考|标准|高|中|极高|最新的|最新|深度思考|高级|扩展|最高)$/i;
+  const bareModeHint = /^(?:instant|thinking|pro|auto|default|medium|high|extra high|very high|extended|pro extended|fast|balanced|standard|极速|快速|均衡|自动|思考|标准|高|中|极高|最新的|最新|深度思考|高级|扩展|最高)$/i;
   const compactModeHint = /^(?:\d+(?:\.\d+)?)(?:instant|thinking|pro|high|medium|均衡|高|中|极速)$/i;
   const genericModelText = /^(?:ChatGPT|Model|模型|Choose model|Select model|Select ChatGPT model|New chat|新聊天|选择模型|选择 ChatGPT 模型)$/i;
 
@@ -98,7 +98,52 @@
       const label = normalizeModelLabel(el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent);
       if (label && !label.startsWith('模式：')) return label;
     }
+    // The composer may be restructured without a stable class/test-id.
+    // Only inspect button labels INSIDE composer forms; never scan chat text.
+    for (const el of document.querySelectorAll('form button, [data-testid="chat-composer"] button, [data-testid="composer"] button')) {
+      if (!visible(el)) continue;
+      const label = normalizeModelLabel(
+        el.getAttribute('data-model') || el.getAttribute('aria-label') ||
+        el.getAttribute('title') || el.textContent
+      );
+      if (!label) continue;
+      if (!label.startsWith('模式：')) return label;
+      if (!modeOnly) modeOnly = label;
+    }
     return modeOnly;
+  }
+
+  // Diagnostics report only model-picker controls, NEVER conversation content,
+  // page titles, messages, account identifiers, or unrecognized button text.
+  function modelDiagnostic() {
+    const pillNodes = [...document.querySelectorAll(
+      'button.__composer-pill, button[class*="__composer-pill"], [data-testid*="model-switcher"]'
+    )].slice(0, 12);
+    const visiblePills = pillNodes.filter(visible);
+    const recognizedPills = visiblePills
+      .map(el => normalizeModelLabel(
+        el.getAttribute('data-model') || el.getAttribute('aria-label') ||
+        el.getAttribute('title') || el.textContent
+      ))
+      .filter(Boolean).slice(0, 3);
+    const model = currentModelLabel();
+    const taggedAssistantMessages = document.querySelectorAll(
+      '[data-message-author-role="assistant"][data-message-model-slug]'
+    ).length;
+    return {
+      ok: true, scriptVersion: '1.8.4',
+      activeTask: active,
+      model: model || '',
+      lastModel: lastModel || '',
+      pickerCount: pillNodes.length,
+      visiblePickerCount: visiblePills.length,
+      recognizedPills,
+      taggedAssistantMessages,
+      reason: model ? 'recognized'
+        : pillNodes.length === 0 ? 'picker-absent'
+        : visiblePills.length === 0 ? 'picker-not-visible'
+        : 'picker-has-no-supported-label'
+    };
   }
 
   const usageIdleMs = 5 * 60 * 1000;
@@ -281,6 +326,11 @@
   }
 
   chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+    if (msg?.type === 'TOKEN_DESK_MODEL_DIAGNOSTIC') {
+      sendState(true);
+      reply?.(modelDiagnostic());
+      return false;
+    }
     if (msg?.type !== 'TOKEN_DESK_TASK_REFRESH') return false;
     sendState(true);
     reply?.({ok:true,active});
@@ -328,5 +378,6 @@
     globalThis.__TOKEN_DESK_TASK_TEST_ACTION__ = text => actionText.test(clean(text));
     globalThis.__TOKEN_DESK_TASK_TEST_MODEL__ = text => normalizeModelLabel(text);
     globalThis.__TOKEN_DESK_TASK_TEST_CURRENT_MODEL__ = currentModelLabel;
+    globalThis.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__ = modelDiagnostic;
   }
 })();
