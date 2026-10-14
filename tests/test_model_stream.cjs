@@ -35,7 +35,8 @@ assert.equal(parse({resolved_model_slug:'gpt-6-thinking',content:'should not be 
   assert.equal(observed.length,1,JSON.stringify(messages));
   assert.equal(observed[0].model,'gpt-6-thinking');
   assert.equal(observed[0].source,'resolved_model_slug');
-  assert.deepEqual(Object.keys(observed[0]).sort(),['channel','model','source','type']);
+  assert.deepEqual(Object.keys(observed[0]).sort(),['channel','model','route','source','type']);
+  assert.equal(observed[0].route,'/c/test');
   assert(!JSON.stringify(observed).includes('assistant text'));
   const before=observed.length;
   await window.fetch('https://chatgpt.com/api/other',{method:'POST'});
