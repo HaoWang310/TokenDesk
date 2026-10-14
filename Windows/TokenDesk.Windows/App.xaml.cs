@@ -38,9 +38,9 @@ public partial class App : System.Windows.Application
             _window?.RefreshFromStore();
             UpdateTray();
         });
-        _bridge.TasksReceived += tasks => Dispatcher.Invoke(() =>
+        _bridge.TasksReceived += snapshot => Dispatcher.Invoke(() =>
         {
-            _store.SetTasks(tasks);
+            _store.SetTaskSnapshot(snapshot);
             _window?.RefreshFromStore();
             UpdateTray();
         });
