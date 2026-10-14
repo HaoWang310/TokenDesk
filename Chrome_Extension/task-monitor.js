@@ -142,6 +142,8 @@
       conversationFetchSeen,
       streamSeen,
       lastStreamStatus,
+      streamOpen,
+      streamTerminalSeen,
       hookStatus, hookVersion, hookFetchActive,
       pickerCount: pillNodes.length,
       visiblePickerCount: visiblePills.length,
@@ -263,23 +265,42 @@
   }
 
   function activePhase() {
-    // A visible enabled Stop control is positive evidence that a response is
-    // still executing. The model or Work mode selected in a toolbar is NOT.
-    if (hasActiveControl()) return 'working';
-
-    // Live progress can also be text-only, but it must belong to the CURRENT
-    // assistant message rather than navigation, a mode picker or scrollback.
-    const assistantMessages = [...document.querySelectorAll('[data-message-author-role="assistant"]')];
-    const latest = assistantMessages[assistantMessages.length - 1];
-    if (latest) {
-      for (const el of latest.querySelectorAll('[role="status"],[aria-live="polite"],[aria-live="assertive"]')) {
-        if (!visible(el) || el.closest('[role="menu"],button,[role="button"]')) continue;
-        const phase = phaseFromText(el.textContent);
-        if (phase) return phase;
+    const now = Date.now();
+    // A visible Stop action or a *live* progress node in the current response
+    // is evidence of ongoing execution. The toolbar mode label is not.
+    if (hasActiveControl()) {
+      lastPositiveTaskEvidenceAt = now;
+      return 'working';
+    }
+    const messages = [...document.querySelectorAll('[data-message-author-role="assistant"]')];
+    const latest = messages[messages.length - 1];
+    const candidates = latest
+      ? [...latest.querySelectorAll('[role="status"],[aria-live="polite"],[aria-live="assertive"]')]
+      : [];
+    // Modern Thinking UI sometimes renders the live progress strip outside
+    // the assistant message, under <main>. Do not scan all page text.
+    candidates.push(...document.querySelectorAll(
+      'main [role="status"],main [aria-live="polite"],main [aria-live="assertive"]'
+    ));
+    for (const el of candidates) {
+      if (!visible(el) ||
+          el.closest?.('nav,aside,[role="menu"],[role="dialog"],[data-testid*="sidebar"],form')) continue;
+      const evidence = phaseFromText(el.textContent);
+      if (evidence) {
+        lastPositiveTaskEvidenceAt = now;
+        return evidence;
       }
     }
-    // Do not scan every div/span/p for words like "Working" or "正在工作".
-    // These often describe the selected mode long after a task finished.
+    // While the same conversation's response stream is open, the task is
+    // running even if React temporarily removes the Stop button/status node.
+    if (streamOpen) {
+      lastPositiveTaskEvidenceAt = now;
+      return phase || 'working';
+    }
+    // Brief UI re-renders must not instantly finish a confirmed task.
+    // A positive stream *completion* bypasses this grace window.
+    if (active && !streamTerminalSeen &&
+        now-lastPositiveTaskEvidenceAt < 45_000) return phase || 'working';
     return null;
   }
 
@@ -312,6 +333,9 @@
   let conversationFetchSeen = 0;
   let streamSeen = 0;
   let lastStreamStatus = 'not-observed';
+  let streamOpen = false;
+  let lastPositiveTaskEvidenceAt = 0;
+  let streamTerminalSeen = false;
   let hookStatus = 'not-checked';
   let hookVersion = '';
   let hookFetchActive = false;
@@ -340,6 +364,21 @@
       hookVersion = typeof detail.hookVersion === 'string' ?
         detail.hookVersion.slice(0,20) : '';
       hookFetchActive = detail.fetchWrapped === true;
+      return;
+    }
+    if (detail.type === 'TASK_STREAM') {
+      if (!compatibleModelRoute(detail.route) ||
+          !['open','closed','uncertain'].includes(detail.status)) return;
+      if (detail.status === 'open') {
+        streamOpen = true;
+        streamTerminalSeen = false;
+        lastPositiveTaskEvidenceAt = Date.now();
+      } else {
+        streamOpen = false;
+        streamTerminalSeen = detail.status === 'closed';
+        if (streamTerminalSeen) lastPositiveTaskEvidenceAt = 0;
+      }
+      sendState(true);
       return;
     }
     if (detail.type === 'MODEL_TRACE') {
@@ -381,6 +420,8 @@
 
   function sendState(force = false) {
     const now = Date.now();
+    // Resolve route before evaluating the task evidence to avoid carrying a
+    // stale stream from another conversation into the new chat.
     const nextPhase = activePhase();
     const next = nextPhase !== null;
     // Keep the last confirmed UI label while a transient picker redraws.
@@ -402,6 +443,9 @@
         requestedModelReceivedAt = 0;
         resolvedModelReceivedAt = 0;
         lastModel = null;
+        streamOpen = false;
+        streamTerminalSeen = false;
+        lastPositiveTaskEvidenceAt = 0;
       }
       modelRoute = location.pathname;
     }
