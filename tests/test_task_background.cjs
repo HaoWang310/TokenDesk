@@ -1,12 +1,12 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const code=fs.readFileSync(__dirname+'/../Chrome_Extension/background.js','utf8');
 let receiver; let lastTaskBody=null; const storage={pairingCode:'a'.repeat(64)};
-const evt={addListener:()=>{}};
+const evt={addListener:()=>{}};let onTabRemoved=null;
 const chrome={
   runtime:{onMessage:{addListener:x=>receiver=x},onInstalled:evt,onStartup:evt},
   storage:{local:{async get(d){return {...d,...storage}},async set(v){Object.assign(storage,v)}}},
   alarms:{create:()=>{},onAlarm:evt},
-  tabs:{query:async()=>[],sendMessage:async()=>({}),onRemoved:evt,onUpdated:evt},
+  tabs:{query:async()=>[],sendMessage:async()=>({}),onRemoved:{addListener:handler=>{onTabRemoved=handler;}},onUpdated:evt},
   scripting:{executeScript:async()=>{}}
 };
 const fetch=async(url,opts={})=>{
@@ -56,6 +56,15 @@ function sendTask(active){
   assert(diagnostics && diagnostics.ok);
   assert.strictEqual(diagnostics.tabCount,0);
   assert(Array.isArray(diagnostics.reports) && diagnostics.reports.length === 0);
+  // Closing the ChatGPT tab must NOT claim that cloud work stopped,
+  // nor should the detached task be counted as confirmed live execution.
+  assert.strictEqual(typeof onTabRemoved,'function');
+  onTabRemoved(7);
+  await new Promise(r=>setTimeout(r,250));
+  assert.strictEqual(lastTaskBody.tasks.length,1);
+  assert.strictEqual(lastTaskBody.tasks[0].phase,'unverified');
+  assert.strictEqual(lastTaskBody.tasks[0].title,'Long analysis');
+  // Reopening the conversation and observing completion removes it.
   sendTask(false); await new Promise(r=>setTimeout(r,250));
   assert.strictEqual(lastTaskBody.tasks.length,0);
   console.log('PASS task background aggregation');
