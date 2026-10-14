@@ -1,4 +1,4 @@
-# TokenDesk for Windows v1.2.1
+# TokenDesk for Windows v1.2.2
 
 Windows 10 / 11 原生桌面版本，复用 TokenDesk 的 Chrome 扩展与本机桥接协议。
 
