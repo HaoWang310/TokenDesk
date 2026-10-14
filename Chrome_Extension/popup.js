@@ -89,6 +89,12 @@ document.getElementById('model-check').addEventListener('click', () => {
         lines.push(label + '找到 ' + item.visiblePickerCount + ' 个模型按钮，但按钮未提供可识别的名称');
       }
       if (item.status !== 'content-script-missing') {
+        if (item.hookStatus === 'connected') {
+          lines.push('  网络监听脚本：已连接 v' + (item.hookVersion || '?') +
+            ' · fetch 仍由 TokenDesk 接管：' + (item.hookFetchActive ? '是' : '否（可能被网页或其他扩展替换）'));
+        } else {
+          lines.push('  网络监听脚本：未连接，请确认 v1.8.12 已加载，并刷新 ChatGPT 页面');
+        }
         lines.push('  网络 conversation 请求：' + (item.conversationFetchSeen || 0) +
           ' · SSE 流：' + (item.streamSeen || 0) +
           ' · 最新状态：' + (item.lastStreamStatus || 'not-observed'));
@@ -98,6 +104,7 @@ document.getElementById('model-check').addEventListener('click', () => {
         );
       }
     }
+    lines.push('网页监听正常但请求数为0：请发送一条新消息再检查。不需要重新安装 TokenDesk 桌面程序。');
     lines.push('如果仍显示未识别，请把此诊断结果截图发来；诊断不包含聊天正文。');
     panel.textContent = lines.join('\n');
     panel.style.whiteSpace = 'pre-line';
