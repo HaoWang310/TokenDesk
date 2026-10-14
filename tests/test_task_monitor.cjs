@@ -1,11 +1,14 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const src=fs.readFileSync(__dirname+'/../Chrome_Extension/task-monitor.js','utf8');
 const noop=()=>{};
+const messages=[];
+const windowListeners={};
+const pageWindow={addEventListener:(name,fn)=>{windowListeners[name]=fn;}};
 const sandbox={
-  globalThis:{__TOKEN_DESK_TASK_TEST__:true},
+  globalThis:{__TOKEN_DESK_TASK_TEST__:true},window:pageWindow,
   document:{documentElement:null,addEventListener:noop},
   location:{pathname:'/c/test',origin:'https://chatgpt.com',href:'https://chatgpt.com/c/test'},
-  chrome:{runtime:{onMessage:{addListener:noop},sendMessage:()=>Promise.resolve()}},
+  chrome:{runtime:{onMessage:{addListener:noop},sendMessage:(m)=>{messages.push(m);return Promise.resolve();},lastError:null}},
   MutationObserver:function(){this.observe=noop;},
   addEventListener:noop,setInterval:noop,setTimeout:noop,getComputedStyle:()=>({display:'block',visibility:'visible',opacity:'1'}),
   console
@@ -59,7 +62,7 @@ pill=fakeNode('6Pro');
 checked=fakeNode('GPT-6 Pro');
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_CURRENT_MODEL__(),'GPT-6 Pro');
 const report=sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__();
-assert.strictEqual(report.scriptVersion,'1.8.4');
+assert.strictEqual(report.scriptVersion,'1.8.6');
 assert.strictEqual(report.reason,'recognized');
 assert.strictEqual(report.model,'GPT-6 Pro');
 assert.strictEqual(report.pickerCount,1);
@@ -68,6 +71,23 @@ assert.strictEqual(report.taggedAssistantMessages,0);
 assert.ok(!('title' in report) && !('url' in report),'diagnostics must exclude URLs and chat titles');
 pill=null;checked=null;
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().reason,'picker-absent');
+assert.strictEqual(typeof windowListeners.message,'function');
+windowListeners.message({
+  source:pageWindow,origin:'https://chatgpt.com',
+  data:{channel:'TOKEN_DESK_NETWORK_V1',type:'MODEL',source:'resolved_model_slug',model:'gpt-6-thinking'}
+});
+const latest=messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1);
+assert(latest && latest.payload.model==='gpt-6-thinking','stream model must reach task snapshot');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().modelSource,'resolved_model_slug');
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().model,'gpt-6-thinking');
+// A different SPA conversation must not inherit the prior model.
+sandbox.location.pathname='/c/another';
+sandbox.location.href='https://chatgpt.com/c/another';
+// Test hook receives only the stream value in the previous conversation.
+windowListeners.message({source:pageWindow,origin:'https://evil.example',
+  data:{channel:'TOKEN_DESK_NETWORK_V1',type:'MODEL',source:'resolved_model_slug',model:'gpt-9-evil'}});
+assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.model,'gpt-6-thinking');
+
 
 
 
