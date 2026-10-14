@@ -105,13 +105,29 @@ assert(latest && latest.payload.model==='gpt-6-thinking','stream model must reac
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().modelSource,'resolved_model_slug');
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().model,'gpt-6-thinking');
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__().lastStreamStatus,'model-found');
+sandbox.location.pathname='/';
+sandbox.location.href='https://chatgpt.com/';
+sandbox.__TOKEN_DESK_TASK_TEST_SEND__(true);
+windowListeners.message({source:pageWindow,origin:'https://chatgpt.com',
+  data:{channel:'TOKEN_DESK_NETWORK_V1',type:'MODEL',source:'resolved_model_slug',model:'gpt-6-thinking'}});
+sandbox.location.pathname='/c/new-chat-id';
+sandbox.location.href='https://chatgpt.com/c/new-chat-id';
+sandbox.__TOKEN_DESK_TASK_TEST_SEND__(true);
+assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.model,
+  'gpt-6-thinking','new-chat redirect must preserve fresh stream model');
+sandbox.location.pathname='/c/unrelated-conversation';
+sandbox.location.href='https://chatgpt.com/c/unrelated-conversation';
+sandbox.__TOKEN_DESK_TASK_TEST_SEND__(true);
+assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.model,
+  '','navigating to a different existing chat must clear the previous model');
+
 // A different SPA conversation must not inherit the prior model.
 sandbox.location.pathname='/c/another';
 sandbox.location.href='https://chatgpt.com/c/another';
 // Test hook receives only the stream value in the previous conversation.
 windowListeners.message({source:pageWindow,origin:'https://evil.example',
   data:{channel:'TOKEN_DESK_NETWORK_V1',type:'MODEL',source:'resolved_model_slug',model:'gpt-9-evil'}});
-assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.model,'gpt-6-thinking');
+assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.model,'');
 
 
 
