@@ -356,6 +356,7 @@ async function sendUsage(payload) {
 const taskStates = new Map();
 const observedModels = new Map();
 const MODEL_OBSERVATION_TTL_MS = 2 * 60 * 60 * 1000;
+const TASK_HEARTBEAT_GRACE_MS = 150_000; // Chrome throttles hidden tabs; 45s was too strict.
 
 // A conversation's confirmed model can arrive before its run state or before
 // a DOM redraw. Preserve that nonempty observation so subsequent empty UI
@@ -462,7 +463,7 @@ function currentTasks() {
   const now = Date.now();
   const dedup = new Map();
   for (const [tabId, task] of taskStates) {
-    if (!task.active || now-task.lastSeenAt > 45_000) {
+    if (!task.active || now-task.lastSeenAt > TASK_HEARTBEAT_GRACE_MS) {
       detachTask(tabId);
       continue;
     }
