@@ -158,6 +158,7 @@ assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).p
 sandbox.location.pathname='/c/another';
 sandbox.location.href='https://chatgpt.com/c/another';
 sandbox.document.querySelectorAll=()=>[];
+sandbox.__TOKEN_DESK_TASK_TEST_SEND__(true); // finish the prior SPA route transition
 windowListeners.message({source:pageWindow,origin:'https://chatgpt.com',
   data:{channel:'TOKEN_DESK_NETWORK_V1',type:'TASK_STREAM',status:'open',route:'/c/another'}});
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTIVE_PHASE__(),'working');
