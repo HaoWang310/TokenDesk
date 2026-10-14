@@ -347,7 +347,7 @@ async function sendTasksSnapshot() {
     observedAt: Math.floor(Date.now()/1000),
     usageDays,
     tasks: tasks.map(t=>({
-      id:t.id,phase:t.phase === 'thinking' ? 'thinking' : 'working',
+      id:t.id,phase:t.phase === 'unverified' ? 'unverified' : (t.phase === 'thinking' ? 'thinking' : 'working'),
       model:t.model || '',
       title:t.title || 'ChatGPT 任务',pageURL:t.pageURL,
       startedAt:Math.floor(t.startedAt/1000),lastSeenAt:Math.floor(t.lastSeenAt/1000)
