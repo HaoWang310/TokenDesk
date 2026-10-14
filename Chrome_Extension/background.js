@@ -541,6 +541,10 @@ async function diagnoseOpenModelPickers() {
         streamSeen: Math.max(0, Math.min(1000, Number(result.streamSeen) || 0)),
         lastStreamStatus: typeof result.lastStreamStatus === 'string'
           ? result.lastStreamStatus.slice(0, 32) : 'not-observed',
+        hookStatus: result.hookStatus === 'connected' ? 'connected' : 'not-connected',
+        hookVersion: typeof result.hookVersion === 'string' ?
+          result.hookVersion.slice(0,20) : '',
+        hookFetchActive: result.hookFetchActive === true,
         pickerCount: Math.max(0, Math.min(12, Number(result.pickerCount) || 0)),
         visiblePickerCount: Math.max(0, Math.min(12, Number(result.visiblePickerCount) || 0)),
         recognizedPills: Array.isArray(result.recognizedPills)
