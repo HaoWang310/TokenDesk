@@ -48,4 +48,16 @@ assert.deepEqual(currentWeekDayKeys(new Date(2027, 0, 1, 12)), [
   '2026-12-28', '2026-12-29', '2026-12-30', '2026-12-31',
   '2027-01-01', '2027-01-02', '2027-01-03'
 ]);
+// Session coverage must be idempotent across tabs and resets on Monday.
+const {mergeUsageRange,pruneSessionIntervals} = global.__TOKEN_DESK_TEST_SESSION__;
+assert.deepEqual(mergeUsageRange([[1000,11000]],[1000][0],11000),[[1000,11000]]);
+assert.deepEqual(mergeUsageRange([[1000,11000]],6000,16000),[[1000,16000]]);
+assert.deepEqual(mergeUsageRange([[1000,11000]],11000,21000),[[1000,21000]]);
+const saturday = new Date(2026,9,17,12).getTime();
+const older = new Date(2026,9,11,12).getTime();
+assert.deepEqual(pruneSessionIntervals({
+  '2026-10-11':[[older,older+10000]],
+  '2026-10-17':[[saturday,saturday+10000]]
+},new Date(2026,9,17,13)),{'2026-10-17':[[saturday,saturday+10000]]});
+
 console.log('PASS Monday-Sunday local usage reset');
