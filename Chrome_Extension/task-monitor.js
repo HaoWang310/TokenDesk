@@ -246,7 +246,12 @@
 
   function hasActiveControl() {
     for (const selector of stopSelectors) {
-      for (const el of document.querySelectorAll(selector)) if (visible(el)) return true;
+      for (const el of document.querySelectorAll(selector)) {
+        // The stop button may linger disabled for a moment after generation
+        // finishes; visibility alone is not proof of a live task.
+        if (visible(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true')
+          return true;
+      }
     }
     for (const el of document.querySelectorAll('button,[role="button"]')) {
       if (!visible(el)) continue;
