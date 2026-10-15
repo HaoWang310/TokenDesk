@@ -10,7 +10,7 @@
   let requestTemplate = null;
   let lastPayload = null;
   let refreshBusy = false;
-  const HOOK_VERSION = '1.8.16';
+  const HOOK_VERSION = '1.8.17';
   // Maintain the latest confirmed model per conversation route. Keeping only
   // one global lastModelSignal caused overlapping Work and chat requests to
   // overwrite each other before the isolated script had started listening.
