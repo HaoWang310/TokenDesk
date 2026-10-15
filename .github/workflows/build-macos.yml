@@ -80,13 +80,13 @@ jobs:
               QuotaModels.swift BrowserUsage.swift BrowserBridge.swift TokenDeskApp.swift \
               -framework SwiftUI -framework AppKit -framework Network -framework UserNotifications \
               -o "$RUNNER_TEMP/TokenDesk-$ARCH"
-            lipo -verify_arch "$ARCH" "$RUNNER_TEMP/TokenDesk-$ARCH"
+            lipo "$RUNNER_TEMP/TokenDesk-$ARCH" -verify_arch "$ARCH"
             echo "Verified $ARCH executable: $(lipo -archs "$RUNNER_TEMP/TokenDesk-$ARCH")"
           done
           # A Rosetta terminal should install native arm64 on Apple Silicon.
           grep -Fq 'ROSETTA_TRANSLATED=' install.command
           grep -Fq 'TARGET_ARCH="arm64"' install.command
-          grep -Fq 'lipo -verify_arch "$TARGET_ARCH"' install.command
+          grep -Fq -- '-verify_arch "$TARGET_ARCH"' install.command
 
       - name: Generate app icon assets
         shell: bash
