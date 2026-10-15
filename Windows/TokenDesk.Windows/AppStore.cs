@@ -32,6 +32,21 @@ public sealed class AppStore
     {
         get { lock (_gate) return _state.PairingCode; }
     }
+    public bool AlwaysOnTop
+    {
+        get { lock (_gate) return _state.AlwaysOnTop; }
+    }
+
+    public void SetAlwaysOnTop(bool enabled)
+    {
+        lock (_gate)
+        {
+            if (_state.AlwaysOnTop == enabled) return;
+            _state.AlwaysOnTop = enabled;
+            SaveLocked();
+        }
+    }
+
 
     public QuotaSnapshotState? LastQuota
     {
