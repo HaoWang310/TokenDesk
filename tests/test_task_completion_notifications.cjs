@@ -34,7 +34,7 @@ const fetch=async(url,opts={})=>{
   throw Error(String(url));
 };
 const context={chrome,fetch,AbortController,Date,
-  setTimeout(fn,delay,...args){return setTimeout(fn,delay===2500?50:delay,...args);},
+  setTimeout(fn,delay,...args){return setTimeout(fn,delay===900?50:delay,...args);},
   clearTimeout,Response,console};
 vm.runInNewContext(source,context);
 const startedAt=Math.floor(Date.now()/1000)-15;
