@@ -17,7 +17,7 @@ struct RunningChatTask: Equatable, Identifiable {
     let lastSeenAt: Date
 }
 
-struct DailyUsageStat: Equatable, Identifiable {
+struct DailyUsageStat: Equatable, Identifiable, Codable {
     let day: String
     let activeSeconds: Int
     let weeklyQuotaUsed: Int
