@@ -23,7 +23,7 @@ Current data path:
 
 After the first pairing, Chrome can stay in the background. You do **not** need to keep ChatGPT or the Usage page open.
 
-## Current macOS version: v1.8.10
+## Current macOS version: v1.8.11
 
 v1.8.5 improves active-task classification and distinguishes confirmed live web tasks from unverified last-known tasks when a ChatGPT tab closes. Unverified tasks are cached locally for up to two hours and restored after a Chrome extension service-worker restart. This does not verify that cloud tasks are still running after the page closes. Chrome extension v1.8.7 is required.
 
