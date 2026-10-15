@@ -87,6 +87,10 @@ sandbox.document.querySelectorAll = selector => {
   return [];
 };
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTIVE_PHASE__(),'working');
+stopControl.disabled=true;
+assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTIVE_PHASE__(),null,
+  'disabled stale Stop button must not keep an idle task alive');
+stopControl.disabled=false;
 sandbox.document.querySelectorAll=()=>[];
 
 assert.strictEqual(typeof windowListeners.message,'function');
