@@ -62,7 +62,7 @@ pill=fakeNode('6Pro');
 checked=fakeNode('GPT-6 Pro');
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_CURRENT_MODEL__(),'GPT-6 Pro');
 const report=sandbox.__TOKEN_DESK_TASK_TEST_DIAGNOSTIC__();
-assert.strictEqual(report.scriptVersion,'1.8.13');
+assert.strictEqual(report.scriptVersion,'1.8.16');
 assert.strictEqual(report.reason,'recognized');
 assert.strictEqual(report.model,'GPT-6 Pro');
 assert.strictEqual(report.pickerCount,1);
