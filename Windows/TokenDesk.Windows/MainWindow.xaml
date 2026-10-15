@@ -24,15 +24,35 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="18">
-            <DockPanel Margin="0,0,0,14">
-                <StackPanel DockPanel.Dock="Left">
+            <Grid Margin="0,0,0,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
                     <TextBlock Text="TokenDesk" FontSize="22" FontWeight="SemiBold"/>
                     <TextBlock Text="Windows · ChatGPT 用量与任务监控" Foreground="#8E96A8" FontSize="11" Margin="0,3,0,0"/>
                 </StackPanel>
-                <Border DockPanel.Dock="Right" Background="#1D222B" CornerRadius="12" Padding="10,6" HorizontalAlignment="Right">
-                    <TextBlock x:Name="ConnectionText" Text="等待 Chrome…" Foreground="#9DA8BA" FontSize="10"/>
-                </Border>
-            </DockPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="PinButton"
+                            Width="34" Height="32" Padding="4"
+                            Background="#252933" BorderBrush="#3A3F4B"
+                            Click="PinButton_Click"
+                            ToolTip="固定窗口到最前面">
+                        <Path x:Name="PinGlyph"
+                              Width="19" Height="19" Stretch="Uniform"
+                              Stroke="#8E96A8" StrokeThickness="1.9"
+                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Fill="Transparent"
+                              Data="M 16,9 L 16,4 L 17,3 L 17,2 L 7,2 L 7,3 L 8,4 L 8,9 L 6,11 L 6,13 L 18,13 L 18,11 Z M 12,13 L 12,22"/>
+                    </Button>
+                    <Border Background="#1D222B" CornerRadius="12" Padding="9,6" Margin="7,0,0,0"
+                            MinWidth="50" MaxWidth="118" VerticalAlignment="Center">
+                        <TextBlock x:Name="ConnectionText" Text="等待 Chrome…" Foreground="#9DA8BA"
+                                   TextTrimming="CharacterEllipsis" FontSize="10"/>
+                    </Border>
+                </StackPanel>
+            </Grid>
 
             <Grid Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
@@ -170,7 +190,7 @@
                 </StackPanel>
             </Border>
 
-            <TextBlock Text="TokenDesk Windows v1.2.13 · 本机仅监听 127.0.0.1:18743"
+            <TextBlock Text="TokenDesk Windows v1.2.14 · 本机仅监听 127.0.0.1:18743"
                        HorizontalAlignment="Center" Foreground="#555E6E" FontSize="9" Margin="0,14,0,2"/>
         </StackPanel>
     </ScrollViewer>
