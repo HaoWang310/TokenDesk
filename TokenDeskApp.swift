@@ -937,8 +937,58 @@ private struct RunningTasksSection: View {
 }
 
 
+private struct WeeklyTimeSummaryBar: View {
+    let days: [DailyUsageStat]
+    let hasReceivedData: Bool
+
+    private var times: (today: Int, week: Int) {
+        CalendarWeekUsage.summary(days)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text("ChatGPT 使用时长")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.77))
+                Spacer()
+                Text("周一 00:00 清零")
+                    .font(.system(size: 9))
+                    .foregroundColor(.white.opacity(0.43))
+            }
+            HStack(spacing: 9) {
+                metric("今天", value: CalendarWeekUsage.duration(times.today))
+                metric("本周累计", value: CalendarWeekUsage.duration(times.week))
+            }
+            if !hasReceivedData {
+                Text("等待 Chrome 扩展同步 · 安装前未记录的时间无法补录")
+                    .font(.system(size: 9))
+                    .foregroundColor(.white.opacity(0.5))
+            }
+        }
+    }
+
+    private func metric(_ title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 9.5))
+                .foregroundColor(.white.opacity(0.55))
+            Text(value)
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .foregroundColor(.white)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
 private struct WeeklyUsageSection: View {
     let days: [DailyUsageStat]
+    let showMetrics: Bool
 
     private var calendarWeekDays: [DailyUsageStat] {
         CalendarWeekUsage.days(from: days)
@@ -963,9 +1013,11 @@ private struct WeeklyUsageSection: View {
                     .foregroundColor(.white.opacity(0.38))
             }
 
-            HStack(spacing: 9) {
-                metric(title: "今天总使用时长", value: durationText(today?.activeSeconds ?? 0))
-                metric(title: "本周总使用时长", value: durationText(totalSeconds))
+            if showMetrics {
+                HStack(spacing: 9) {
+                    metric(title: "今天总使用时长", value: durationText(today?.activeSeconds ?? 0))
+                    metric(title: "本周总使用时长", value: durationText(totalSeconds))
+                }
             }
 
             barCard(title: "每日使用时间",
@@ -1178,9 +1230,12 @@ private struct TokenDeskScrollContent: View {
                              sourceText: model.activeQuotaSource,
                              isStale: model.activeQuotaIsStale)
                 .padding(.bottom, 15)
+            WeeklyTimeSummaryBar(days: model.usageDays,
+                                 hasReceivedData: !model.usageDays.isEmpty)
+                .padding(.bottom, 15)
             RunningTasksSection(tasks: model.runningTasks)
                 .padding(.bottom, 15)
-            WeeklyUsageSection(days: model.usageDays)
+            WeeklyUsageSection(days: model.usageDays, showMetrics: false)
                 .padding(.bottom, 15)
             QuotaHistorySection(points: model.quotaHistory,
                                 points24h: model.quotaHistory24h,
@@ -1259,6 +1314,8 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
     private var quotaObserver: AnyCancellable?
     private var fiveHourItem: NSMenuItem!
     private var weeklyItem: NSMenuItem!
+    private var todayTimeItem: NSMenuItem!
+    private var weekTimeItem: NSMenuItem!
     private var resetsItem: NSMenuItem!
     private var quotaStateItem: NSMenuItem!
     private var taskCountItem: NSMenuItem!
@@ -1305,10 +1362,14 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
         let menu = NSMenu()
         fiveHourItem = NSMenuItem(title: "5 小时额度：—", action: nil, keyEquivalent: "")
         weeklyItem = NSMenuItem(title: "每周额度：—", action: nil, keyEquivalent: "")
+        todayTimeItem = NSMenuItem(title: "今天使用时长：0秒", action: nil, keyEquivalent: "")
+        weekTimeItem = NSMenuItem(title: "本周累计时长：0秒", action: nil, keyEquivalent: "")
         resetsItem = NSMenuItem(title: "可用重置：—", action: nil, keyEquivalent: "")
         quotaStateItem = NSMenuItem(title: "额度未连接", action: nil, keyEquivalent: "")
         taskCountItem = NSMenuItem(title: "运行任务：0", action: nil, keyEquivalent: "")
-        [fiveHourItem!, weeklyItem!, resetsItem!, taskCountItem!, quotaStateItem!].forEach { menu.addItem($0) }
+        [fiveHourItem!, weeklyItem!, resetsItem!].forEach { menu.addItem($0) }
+        menu.addItem(.separator())
+        [todayTimeItem!, weekTimeItem!, taskCountItem!, quotaStateItem!].forEach { menu.addItem($0) }
         menu.addItem(.separator())
         menu.addItem(withTitle: "显示 / 隐藏面板", action: #selector(togglePanel), keyEquivalent: "")
         menu.addItem(withTitle: "重置面板位置并显示", action: #selector(resetPanelLocation), keyEquivalent: "")
@@ -1417,6 +1478,9 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
         fiveHourItem.title = line("5 小时剩余", quota?.fiveHour)
         weeklyItem.title = line("每周剩余", quota?.weekly)
         resetsItem.title = quota?.availableResets.map { "可用重置：\($0) 次" } ?? "可用重置：—"
+        let summary = CalendarWeekUsage.summary(model.usageDays)
+        todayTimeItem.title = "今天使用时长：" + CalendarWeekUsage.duration(summary.today)
+        weekTimeItem.title = "本周累计时长：" + CalendarWeekUsage.duration(summary.week)
         taskCountItem.title = "运行任务：\(model.runningTaskSummary)"
         quotaStateItem.title = model.activeQuotaSource
         status.button?.toolTip = "ChatGPT 剩余额度（非 Token） · " + model.activeQuotaSource
