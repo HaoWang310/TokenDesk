@@ -10,21 +10,55 @@
   let requestTemplate = null;
   let lastPayload = null;
   let refreshBusy = false;
-  const HOOK_VERSION = '1.8.13';
-  let lastModelSignal = null;
+  const HOOK_VERSION = '1.8.16';
+  // Maintain the latest confirmed model per conversation route. Keeping only
+  // one global lastModelSignal caused overlapping Work and chat requests to
+  // overwrite each other before the isolated script had started listening.
+  const modelSignalsByRoute = new Map();
   let fetchWrapper = null;
   const MAX_REPLAY_AGE_MS = 5 * 60 * 1000;
+  const MAX_REPLAY_ROUTES = 24;
+
+  function normalizedModelRoute(route) {
+    const path = typeof route === 'string' && route.startsWith('/') ? route : location.pathname;
+    return path.slice(0, 300);
+  }
   function publishModel(type, model, source, route) {
-    const record = {
-      type, model, source,
-      route: typeof route === 'string' ? route.slice(0, 300) : location.pathname,
-      at: Date.now()
-    };
-    if (type === 'MODEL' || !lastModelSignal || lastModelSignal.type !== 'MODEL' ||
-        lastModelSignal.route !== record.route) {
-      lastModelSignal = record;
+    const routeKey = normalizedModelRoute(route);
+    const record = {type, model, source, route:routeKey, at:Date.now()};
+    const prior = modelSignalsByRoute.get(routeKey);
+    // A request-selected model must never replace a server-confirmed model
+    // for the same route. Distinct routes must not overwrite each other.
+    if (type === 'MODEL' || !prior || prior.type !== 'MODEL') {
+      modelSignalsByRoute.delete(routeKey);
+      modelSignalsByRoute.set(routeKey,record);
     }
-    emit(type, { model, source, route:record.route });
+    const now = Date.now();
+    for (const [key, entry] of modelSignalsByRoute) {
+      if (now-entry.at > MAX_REPLAY_AGE_MS) modelSignalsByRoute.delete(key);
+    }
+    while (modelSignalsByRoute.size > MAX_REPLAY_ROUTES) {
+      modelSignalsByRoute.delete(modelSignalsByRoute.keys().next().value);
+    }
+    emit(type, {model,source,route:routeKey});
+  }
+  function replayModelSignals() {
+    const now = Date.now();
+    const route = location.pathname;
+    const candidates = [...modelSignalsByRoute.values()].filter(entry => {
+      if (now-entry.at >= MAX_REPLAY_AGE_MS) return false;
+      if (entry.route === route) return true;
+      // A freshly created chat may have started from the new-chat landing.
+      // Avoid replaying an unrelated existing conversation's model.
+      if (now-entry.at >= 90_000) return false;
+      if ((entry.route === '/' || entry.route === '') && /^\/c\/[^/]+$/.test(route)) return true;
+      const project = /^\/g\/[^/]+\/?$/.test(entry.route);
+      return project && route.startsWith(entry.route.replace(/\/$/,'')+'/c/');
+    }).sort((a,b) => b.at-a.at);
+    if (candidates.length) {
+      const best = candidates[0];
+      emit(best.type,{model:best.model,source:best.source,route:best.route});
+    }
   }
 
 
@@ -82,7 +116,7 @@
       if (length > 131072) return;
       input.clone().text().then(text => {
         const found = requestModelFromJSON(text);
-        if (found) emit('REQUEST_MODEL', {model:found,source:'request_body'});
+        if (found) publishModel('REQUEST_MODEL',found,'request_body',route);
       }).catch(()=>{});
     }
   }
@@ -377,10 +411,7 @@
         hookVersion:HOOK_VERSION,
         fetchWrapped:!!fetchWrapper && window.fetch === fetchWrapper
       });
-      const saved = lastModelSignal;
-      if (saved && Date.now()-saved.at < MAX_REPLAY_AGE_MS) {
-        publishModel(saved.type, saved.model, saved.source, saved.route);
-      }
+      replayModelSignals();
     }
     else if (m.type === 'REFRESH') replayUsageRequest();
     else if (m.type === 'REPLAY_LAST') {
@@ -395,6 +426,9 @@
 
   emit('READY', { ready: false });
   if (globalThis.__TOKEN_DESK_TEST__) {
+    globalThis.__TOKEN_DESK_TEST_MODEL_ROUTES__ = () => [...modelSignalsByRoute.values()].map(
+      entry => ({route:entry.route, model:entry.model, type:entry.type})
+    );
     globalThis.__TOKEN_DESK_TEST_PARSE__ = parseUsageJSON;
     globalThis.__TOKEN_DESK_TEST_MODEL_FROM_EVENT__ = resolvedModelFromEvent;
     globalThis.__TOKEN_DESK_TEST_REQUEST_MODEL__ = requestModelFromJSON;
