@@ -8,6 +8,69 @@ import UserNotifications
 // There is no Codex CLI process launch, ~/.codex log scan, token accounting,
 // Admin Usage API key, or background Codex polling in this build.
 
+// All time statistics use the local Monday-Sunday reporting week, not
+// the account-specific ChatGPT quota reset cycle.
+private enum CalendarWeekUsage {
+    static func dayKey(_ date: Date, calendar: Calendar = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    static func days(from records: [DailyUsageStat], now: Date = Date()) -> [DailyUsageStat] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        let daysSinceMonday = (calendar.component(.weekday, from: today) + 5) % 7
+        guard let monday = calendar.date(byAdding: .day, value: -daysSinceMonday, to: today) else {
+            return []
+        }
+        let recordsByDay = Dictionary(records.map { ($0.day, $0) },
+                                      uniquingKeysWith: { _, latest in latest })
+        return (0..<7).compactMap { offset in
+            guard let day = calendar.date(byAdding: .day, value: offset, to: monday) else { return nil }
+            let key = dayKey(day, calendar: calendar)
+            return recordsByDay[key] ?? DailyUsageStat(day: key, activeSeconds: 0, weeklyQuotaUsed: 0)
+        }
+    }
+
+    static func summary(_ records: [DailyUsageStat], now: Date = Date()) -> (today: Int, week: Int) {
+        let entries = days(from: records, now: now)
+        let today = entries.first(where: { $0.day == dayKey(now) })?.activeSeconds ?? 0
+        return (today, entries.reduce(0) { $0 + $1.activeSeconds })
+    }
+
+    static func duration(_ seconds: Int) -> String {
+        if seconds <= 0 { return "0秒" }
+        if seconds < 60 { return "\(seconds)秒" }
+        if seconds < 3600 { return "\(seconds / 60)分\(seconds % 60)秒" }
+        return "\(seconds / 3600)时\((seconds % 3600) / 60)分\(seconds % 60)秒"
+    }
+}
+
+private enum WeeklyTimeStore {
+    static let key = "TokenDeskDailyUsageSnapshot_v1"
+
+    static func load(now: Date = Date()) -> [DailyUsageStat] {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let decoded = try? JSONDecoder().decode([DailyUsageStat].self, from: data) else {
+            return []
+        }
+        let allowed = Set(CalendarWeekUsage.days(from: [], now: now).map(\.day))
+        return decoded.filter { allowed.contains($0.day) &&
+            (0...86_400).contains($0.activeSeconds) &&
+            (0...500).contains($0.weeklyQuotaUsed) }
+    }
+
+    static func save(_ entries: [DailyUsageStat]) {
+        let allowed = Set(CalendarWeekUsage.days(from: []).map(\.day))
+        let current = entries.filter { allowed.contains($0.day) }
+        guard let data = try? JSONEncoder().encode(current) else { return }
+        UserDefaults.standard.set(data, forKey: key)
+    }
+}
+
 private struct QuotaHistoryPoint: Codable, Equatable, Identifiable {
     let timestamp: Date
     let fiveHourRemaining: Int?
@@ -253,6 +316,7 @@ private final class TokenModel: ObservableObject {
             opacity = max(0.60, min(1.0, UserDefaults.standard.double(forKey: "opacity")))
         }
         quotaHistory = QuotaHistoryStore.load()
+        usageDays = WeeklyTimeStore.load()
         browserUsage = LastQuotaCache.load()
         // v1.6.1 already stored quota history but did not have LastQuotaCache.
         // On the first v1.6.2 launch, migrate the newest history point so the
@@ -312,7 +376,12 @@ private final class TokenModel: ObservableObject {
     func receivedTaskSnapshot(_ value: RunningTaskSnapshot) {
         taskSnapshotAt = value.observedAt
         runningTasks = value.tasks
-        usageDays = value.usageDays
+        // The extension sends a complete 7-day snapshot. Store it locally so
+        // today's and this week's totals remain visible after a Mac restart.
+        if !value.usageDays.isEmpty {
+            usageDays = value.usageDays
+            WeeklyTimeStore.save(value.usageDays)
+        }
     }
 
     var browserIsFresh: Bool {
@@ -871,38 +940,10 @@ private struct RunningTasksSection: View {
 private struct WeeklyUsageSection: View {
     let days: [DailyUsageStat]
 
-    // Keep the seven chart columns aligned to the local Monday-Sunday week,
-    // including a fresh blank week before the Chrome extension reports it.
-    // This does not change the official ChatGPT weekly quota reset schedule.
     private var calendarWeekDays: [DailyUsageStat] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let weekday = calendar.component(.weekday, from: today)
-        let daysSinceMonday = (weekday + 5) % 7
-        guard let monday = calendar.date(byAdding: .day, value: -daysSinceMonday, to: today) else {
-            return days
-        }
-
-        let formatter = DateFormatter()
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "yyyy-MM-dd"
-
-        return (0..<7).compactMap { offset in
-            guard let date = calendar.date(byAdding: .day, value: offset, to: monday) else {
-                return nil
-            }
-            let key = formatter.string(from: date)
-            return days.first(where: { $0.day == key })
-                ?? DailyUsageStat(day: key, activeSeconds: 0, weeklyQuotaUsed: 0)
-        }
+        CalendarWeekUsage.days(from: days)
     }
-
-    private var currentDayKey: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: Date())
-    }
+    private var currentDayKey: String { CalendarWeekUsage.dayKey(Date()) }
 
     private var today: DailyUsageStat? {
         calendarWeekDays.first(where: { $0.day == currentDayKey })
