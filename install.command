@@ -114,7 +114,7 @@ export MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET"
   -o "$STAGE_APP/Contents/MacOS/TokenDesk"
 # Ensure the actual executable supports the requested CPU rather than
 # reporting a successful build that runs under emulation by accident.
-/usr/bin/lipo -verify_arch "$TARGET_ARCH" "$STAGE_APP/Contents/MacOS/TokenDesk" || {
+/usr/bin/lipo "$STAGE_APP/Contents/MacOS/TokenDesk" -verify_arch "$TARGET_ARCH" || {
   echo "Swift 编译产物架构不正确，预期：$TARGET_ARCH。"
   exit 11
 }
