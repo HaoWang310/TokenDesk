@@ -1,3 +1,7 @@
+## Mac v1.8.11：本周使用时间显示与重启保留
+
+Mac 桌面面板在“剩余额度”下方直接显示“今天使用时长 / 本周累计时长”，并在菜单栏图标的下拉菜单增加两项相同数据；每日柱状图仍可往下滚动查看。Mac 会将浏览器扩展收到的最近每日时长在本机缓存，重启无需等下一次同步才能看到。周一 00:00 自动只展示新的自然周（周一至周日），不会更改 ChatGPT 官方的额度重置周期。使用数据仍需要 Chrome / Edge 扩展主动采集；安装前未记录的历史时长无法补录。现有配对码和历史记录保留。
+
 # TokenDesk · macOS + Windows
 
 TokenDesk 是面向 macOS 与 Windows 的 ChatGPT Work / Codex 剩余额度与运行任务监控器。
@@ -66,7 +70,7 @@ Windows 第一版已经加入同一 GitHub 仓库：
 
 Windows 详细说明见 [Windows/README.md](Windows/README.md)。
 
-## macOS v1.8.10 更新
+## macOS v1.8.11 更新
 
 - 统计每天 ChatGPT 主动使用时间；
 - 使用时间定义为：ChatGPT 标签页处于前台，并且最近 5 分钟内有键盘、鼠标、滚动等交互；
