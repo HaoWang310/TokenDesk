@@ -364,15 +364,33 @@
       try { url = input instanceof Request ? input.url : String(input); } catch {}
       if (isUsageURL(url)) rememberFetchRequest(input, init);
       const requestRoute = location.pathname;
-      if (isConversationURL(url)) observeConversationRequest(input, init, requestRoute);
-      const response = await nativeFetch(input, init);
+      const method = String(init?.method ||
+        (input instanceof Request ? input.method : 'GET')).toUpperCase();
+      // Start tracking at fetch initiation, not when the server eventually
+      // returns streaming headers. Only conversation POSTs can start work;
+      // loading conversation history via GET must never start a task.
+      const generation = isConversationURL(url) && method === 'POST';
+      if (generation) {
+        observeConversationRequest(input, init, requestRoute);
+        emit('TASK_REQUEST', {status:'started',route:requestRoute});
+      }
+      let response;
+      try {
+        response = await nativeFetch(input, init);
+      } catch (error) {
+        if (generation) emit('TASK_REQUEST', {status:'uncertain',route:requestRoute});
+        throw error;
+      }
       if (isUsageURL(url)) inspectResponse(response.clone(), url);
-      if (isConversationURL(url)) {
+      if (generation) {
         emit('MODEL_TRACE', {status:'conversation-fetch-seen'});
         if (response.ok && String(response.headers?.get?.('content-type') || '').includes('text/event-stream')) {
-          inspectConversationStream(response.clone(), url, requestRoute).catch(()=>{});
+          inspectConversationStream(response.clone(), url, requestRoute).catch(()=>{
+            emit('TASK_REQUEST', {status:'uncertain',route:requestRoute});
+          });
         } else {
           emit('MODEL_TRACE', {status:'not-event-stream'});
+          emit('TASK_REQUEST', {status:'uncertain',route:requestRoute});
         }
       }
       return response;
