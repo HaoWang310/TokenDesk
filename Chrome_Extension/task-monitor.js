@@ -143,6 +143,7 @@
       streamSeen,
       lastStreamStatus,
       streamOpen,
+      requestPending,
       streamTerminalSeen,
       hookStatus, hookVersion, hookFetchActive,
       pickerCount: pillNodes.length,
@@ -297,10 +298,16 @@
       lastPositiveTaskEvidenceAt = now;
       return phase || 'working';
     }
-    // Brief UI re-renders must not instantly finish a confirmed task.
-    // A positive stream *completion* bypasses this grace window.
+    // The request can be pending before the server sends streaming headers.
+    if (requestPending) {
+      lastPositiveTaskEvidenceAt = now;
+      return phase || 'working';
+    }
+    // Short grace for React control re-renders. Hidden tabs are throttled
+    // more heavily, so retain longer there. Real SSE completion bypasses it.
     if (active && !streamTerminalSeen &&
-        now-lastPositiveTaskEvidenceAt < 45_000) return phase || 'working';
+        now-lastPositiveTaskEvidenceAt < (document.visibilityState === 'visible' ? 3000 : 15000))
+      return phase || 'working';
     return null;
   }
 
@@ -334,6 +341,7 @@
   let streamSeen = 0;
   let lastStreamStatus = 'not-observed';
   let streamOpen = false;
+  let requestPending = false;
   let lastPositiveTaskEvidenceAt = 0;
   let streamTerminalSeen = false;
   let runHadStream = false;
@@ -368,16 +376,31 @@
       hookFetchActive = detail.fetchWrapped === true;
       return;
     }
+    if (detail.type === 'TASK_REQUEST') {
+      if (!compatibleModelRoute(detail.route) ||
+          !['started','uncertain'].includes(detail.status)) return;
+      if (detail.status === 'started') {
+        requestPending = true;
+        streamTerminalSeen = false;
+        lastPositiveTaskEvidenceAt = Date.now();
+      } else {
+        requestPending = false; // failed/non-SSE is not verified completion
+      }
+      sendState(true);
+      return;
+    }
     if (detail.type === 'TASK_STREAM') {
       if (!compatibleModelRoute(detail.route) ||
           !['open','closed','uncertain'].includes(detail.status)) return;
       if (detail.status === 'open') {
+        requestPending = false;
         streamOpen = true;
         streamTerminalSeen = false;
         runHadStream = true;
         streamClosedAt = 0;
         lastPositiveTaskEvidenceAt = Date.now();
       } else {
+        requestPending = false;
         streamOpen = false;
         streamTerminalSeen = detail.status === 'closed';
         streamClosedAt = streamTerminalSeen ? Date.now() : 0;
@@ -447,6 +470,7 @@
         resolvedModelReceivedAt = 0;
         lastModel = null;
         streamOpen = false;
+        requestPending = false;
         streamTerminalSeen = false;
         runHadStream = false;
         streamClosedAt = 0;
@@ -500,7 +524,7 @@
   const observer = new MutationObserver(() => {
     if (pending) return;
     pending = true;
-    setTimeout(() => { pending = false; sendState(false); }, 250);
+    setTimeout(() => { pending = false; sendState(false); }, 100);
   });
 
   function start() {
@@ -579,7 +603,7 @@
       if (!monitorContextValid) return;
       sendState(false);
       scheduleHeartbeat();
-    }, active ? 5000 : 15000);
+    }, active ? 2000 : 5000);
   }
   scheduleHeartbeat();
 
