@@ -36,6 +36,7 @@ printf '║          TOKEN DESK · macOS 安装器 v1.8.11      ║\n'
 printf '╚═══════════════════════════════════════════════╝\n\n'
 SYSTEM_VERSION="$(sw_vers -productVersion)"
 MACHINE_ARCH="$(uname -m)"
+ROSETTA_TRANSLATED="$(/usr/sbin/sysctl -n sysctl.proc_translated 2>/dev/null || printf '0')"
 case "$MACHINE_ARCH" in
   x86_64|arm64) TARGET_ARCH="$MACHINE_ARCH" ;;
   *)
@@ -44,10 +45,13 @@ case "$MACHINE_ARCH" in
     ;;
 esac
 DEPLOYMENT_TARGET="12.0"
-if [[ "$MACHINE_ARCH" == "x86_64" ]] && [[ "$(/usr/sbin/sysctl -in sysctl.proc_translated 2>/dev/null || echo 0)" == "1" ]]; then
-  echo '⚠️ 检测到 Apple Silicon 上的 Rosetta 终端：本次会构建 x86_64 版本，仍可运行；若要 arm64 原生版本，请关闭 Terminal 的“使用 Rosetta 打开”后重新安装。'
+# Under Rosetta, uname -m reports x86_64 even on an Apple Silicon Mac.
+# Cross-compile the arm64-native app instead of installing an emulated binary.
+if [[ "$MACHINE_ARCH" == "x86_64" && "$ROSETTA_TRANSLATED" == "1" ]]; then
+  TARGET_ARCH="arm64"
+  echo '检测到 Apple Silicon + Rosetta 终端：自动选择原生 arm64 版本，无需关闭 Rosetta。'
 fi
-printf '系统：%s  架构：%s  编译目标：%s-apple-macosx%s\n' "$SYSTEM_VERSION" "$MACHINE_ARCH" "$TARGET_ARCH" "$DEPLOYMENT_TARGET"
+printf '系统：%s  终端架构：%s  App 原生目标：%s-apple-macosx%s\n' "$SYSTEM_VERSION" "$MACHINE_ARCH" "$TARGET_ARCH" "$DEPLOYMENT_TARGET"
 printf '安装源目录：%s\n' "$SOURCE_DIR"
 printf '安装日志：%s\n\n' "$LOG"
 
@@ -108,6 +112,13 @@ export MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET"
   "$SOURCE_DIR/TokenDeskApp.swift" \
   -framework SwiftUI -framework AppKit -framework Network -framework UserNotifications \
   -o "$STAGE_APP/Contents/MacOS/TokenDesk"
+# Ensure the actual executable supports the requested CPU rather than
+# reporting a successful build that runs under emulation by accident.
+/usr/bin/lipo -verify_arch "$TARGET_ARCH" "$STAGE_APP/Contents/MacOS/TokenDesk" || {
+  echo "Swift 编译产物架构不正确，预期：$TARGET_ARCH。"
+  exit 11
+}
+printf '已验证 App 架构：%s\n' "$(/usr/bin/lipo -archs "$STAGE_APP/Contents/MacOS/TokenDesk")"
 chmod 755 "$STAGE_APP/Contents/MacOS/TokenDesk"
 
 if [[ -f "$SOURCE_DIR/TokenDeskIcon.png" ]]; then
