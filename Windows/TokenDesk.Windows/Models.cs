@@ -64,6 +64,8 @@ public sealed class QuotaAlertEvent
 public sealed class PersistedState
 {
     public string PairingCode { get; set; } = "";
+    // Desktop-only preference. Existing state.json files default to false.
+    public bool AlwaysOnTop { get; set; }
     public QuotaSnapshotState? LastQuota { get; set; }
     public List<HistoryPoint> History { get; set; } = new();
     public string FiveHourLowAlertCycle { get; set; } = "";
