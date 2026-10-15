@@ -69,7 +69,13 @@ if ! /usr/bin/xcrun --find swiftc >/dev/null 2>&1; then
   /usr/bin/xcode-select --install || true
   exit 3
 fi
-SWIFTC="$(/usr/bin/xcrun --find swiftc)"
+SWIFTC="$(/usr/bin/xcrun --sdk macosx --find swiftc)"
+SDK_PATH="$(/usr/bin/xcrun --sdk macosx --show-sdk-path)"
+if [[ -z "$SDK_PATH" || ! -d "$SDK_PATH" ]]; then
+  echo "无法找到有效的 macOS SDK，请检查 Xcode Command Line Tools。"
+  exit 10
+fi
+printf 'macOS SDK：%s\n' "$SDK_PATH"
 SWIFT_LINE="$($SWIFTC --version 2>/dev/null | /usr/bin/head -n 1 || true)"
 SWIFT_VERSION="$(printf '%s\n' "$SWIFT_LINE" | /usr/bin/sed -nE 's/.*Swift version ([0-9]+)\.([0-9]+).*/\1.\2/p')"
 if [[ -n "$SWIFT_VERSION" ]]; then
@@ -95,6 +101,7 @@ printf '[2/5] 编译 Token Desk…\n'
 export MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET"
 "$SWIFTC" -swift-version 5 -Onone -parse-as-library \
   -target "$TARGET_ARCH-apple-macosx$DEPLOYMENT_TARGET" \
+  -sdk "$SDK_PATH" \
   "$SOURCE_DIR/QuotaModels.swift" \
   "$SOURCE_DIR/BrowserUsage.swift" \
   "$SOURCE_DIR/BrowserBridge.swift" \
