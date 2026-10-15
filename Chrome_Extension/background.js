@@ -358,7 +358,7 @@ const COMPLETED_NOTICE_SETTING = 'tokendeskTaskCompletionNoticeEnabledV1';
 const COMPLETED_NOTICE_HISTORY = 'tokendeskTaskCompletionNoticeHistoryV1';
 const COMPLETED_NOTICE_LINKS = 'tokendeskTaskCompletionNoticeLinksV1';
 const COMPLETED_NOTICE_PREFIX = 'tokendesk-complete-';
-const COMPLETED_NOTICE_DELAY_MS = 2500;
+const COMPLETED_NOTICE_DELAY_MS = 900; // Short stability check; handoffs still cancel the pending notice.
 const completionPending = new Map();
 const COMPLETION_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAB10lEQVR42u2bu3HDMAxAZZxnSJcJkhmiKktkCVWZIpWX8BKq7Blcp8tljKTSHU9HiQBIQCAJVi4sHd8jQIq/09Pzy9/QcYGh8+ICXEDn5Zzz8NvtywTEffxkP3uijgJWoEvJgJbgOXVER0DsxY+Piwno1+vEjgSUgDW8FfCUCIwEaAU+VjdMOkAr8FwJ0BI8RwJwXlijBP8SpAgIQ6bG1o/VfSsNPAJcgM8GbXy6HtXnnC1Ab/1PQwZYgi/1nCkBuRDSEsAyvIYEsA4/j5OoBKgBfh6nYR4nEQlgFX5LyO/Pdx8fQkvrr8v77dK+gC14831AifDfg19av2SaVTMXKB36JgVo5b26AExOa+a9qoBwLM/J+yoFrMGorSwNLy4gBoCVogFfXEBs/r4ngZv3JdcJVDpBTCQc0fqqwyAWShNeRMBeeKbgMPCll8lEIiBHgia8aApgJSy/U2KkFkhF+4CUhKPhVTrB3MpLL42rjAJcCI19AbWNkRCmy52hIyGbWBBxAZoCwvN1GvtzUiWs+9aZQY8AqskaW58lYB0yNUmgHJndjYAaJVDPCydToCYJnMPSflyecmOkhgsTFHjyMJhzN8ciPDkCrEaE6qUpnwu4ABfgAloq/yec3yrH8jTrAAAAAElFTkSuQmCC';
 
@@ -572,12 +572,22 @@ function currentTasks() {
   return [...dedup.values()].sort((a,b)=>a.startedAt-b.startedAt).slice(0,20);
 }
 
-async function sendTasksSnapshot() {
+let lastPublishedUsageDays = null;
+let taskSnapshotInFlight = false;
+let taskSnapshotDirty = false;
+let taskSnapshotFast = false;
+
+async function sendTasksSnapshot(preferCachedUsage = false) {
   await hydrateUnverifiedTasks();
   const {pairingCode} = await chrome.storage.local.get({pairingCode:''});
   if (!/^[0-9a-f]{64}$/i.test(pairingCode)) return {ok:false,message:'任务监控等待配对。'};
   const tasks = currentTasks();
-  const usageDays = await usageDaysSnapshot();
+  // Task transitions should not wait for potentially queued usage
+  // bookkeeping; use the most recently confirmed weekly usage snapshot.
+  // A later nonurgent publish refreshes the full usage data.
+  const usageDays = preferCachedUsage && lastPublishedUsageDays
+    ? lastPublishedUsageDays : await usageDaysSnapshot();
+  if (!preferCachedUsage || !lastPublishedUsageDays) lastPublishedUsageDays = usageDays;
   const payload = {
     observedAt: Math.floor(Date.now()/1000),
     usageDays,
@@ -656,9 +666,38 @@ async function diagnoseOpenModelPickers() {
   return { ok: true, version, tabCount: tabs.length, reports };
 }
 
-function scheduleTaskPublish() {
+async function flushTaskSnapshots(preferCachedUsage) {
+  if (taskSnapshotInFlight) {
+    taskSnapshotDirty = true;
+    taskSnapshotFast = taskSnapshotFast || preferCachedUsage;
+    return;
+  }
+  taskSnapshotInFlight = true;
+  try {
+    let fast = preferCachedUsage;
+    do {
+      taskSnapshotDirty = false;
+      await sendTasksSnapshot(fast);
+      fast = taskSnapshotFast;
+      taskSnapshotFast = false;
+    } while (taskSnapshotDirty);
+  } finally {
+    taskSnapshotInFlight = false;
+  }
+}
+
+let pendingTaskPublishFast = false;
+function scheduleTaskPublish(urgent = false) {
+  pendingTaskPublishFast = pendingTaskPublishFast || urgent;
   if (taskPublishTimer) clearTimeout(taskPublishTimer);
-  taskPublishTimer = setTimeout(()=>{ taskPublishTimer=null; sendTasksSnapshot().catch(()=>{}); },120);
+  // State transitions go out on the next tick; passive usage refreshes can
+  // still be coalesced to avoid excessive localhost POSTs.
+  taskPublishTimer = setTimeout(() => {
+    taskPublishTimer = null;
+    const fast = pendingTaskPublishFast;
+    pendingTaskPublishFast = false;
+    flushTaskSnapshots(fast).catch(()=>{});
+  }, urgent || pendingTaskPublishFast ? 0 : 120);
 }
 
 async function refreshTaskTabs(inject = false) {
@@ -859,6 +898,9 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
     if (!task) return false;
     preserveTaskModel(task);
     const previous = taskStates.get(task.tabId);
+    const taskChanged = !previous || previous.active !== task.active ||
+      previous.phase !== task.phase || previous.model !== task.model ||
+      previous.id !== task.id;
     if (task.active) {
       cancelPendingCompletion(task.id);
       taskStates.set(task.tabId, task);
@@ -872,8 +914,11 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
       taskStates.delete(task.tabId);
       if (unverifiedTasks.delete(task.id)) saveUnverifiedTasks();
     }
-    queueActiveUsage(task.usageDay, task.usageSeconds)
-      .finally(() => scheduleTaskPublish());
+    // Publish start/end/phase/model immediately. Do not block on the
+    // usage statistics write queue; this was delaying app task updates.
+    scheduleTaskPublish(taskChanged || !task.active);
+    const usageWrite = queueActiveUsage(task.usageDay, task.usageSeconds);
+    if (task.usageSeconds > 0) usageWrite.finally(() => scheduleTaskPublish());
     sendResponse({ok:true,count:currentTasks().length});
     return false;
   }
