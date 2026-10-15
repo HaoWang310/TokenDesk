@@ -27,6 +27,10 @@ public partial class MainWindow : Window
         InitializeComponent();
         _store = store;
         DataContext = this;
+        // Restore the pin before the window first becomes visible, so it
+        // never flashes as an ordinary window after a previous pinned launch.
+        Topmost = _store.AlwaysOnTop;
+        UpdatePinVisual();
         PairingCodeText.Text = _store.PairingCode;
         AutoStartCheck.IsChecked = IsAutoStartEnabled();
 
@@ -35,6 +39,35 @@ public partial class MainWindow : Window
         _timer.Start();
 
         Loaded += (_, _) => RefreshFromStore();
+    }
+
+    private void PinButton_Click(object sender, RoutedEventArgs e)
+    {
+        var pinned = !_store.AlwaysOnTop;
+        _store.SetAlwaysOnTop(pinned);
+        Topmost = pinned;
+        UpdatePinVisual();
+        if (pinned) Activate();
+    }
+
+    private void UpdatePinVisual()
+    {
+        var pinned = _store.AlwaysOnTop;
+        PinButton.ToolTip = pinned
+            ? "已固定在最前 · 点击取消置顶"
+            : "固定窗口在其他应用前";
+        PinButton.Background = pinned
+            ? new System.Windows.Media.SolidColorBrush(WpfColor.FromRgb(31, 64, 58))
+            : new System.Windows.Media.SolidColorBrush(WpfColor.FromRgb(37, 41, 51));
+        PinButton.BorderBrush = pinned
+            ? new System.Windows.Media.SolidColorBrush(WpfColor.FromRgb(70, 170, 139))
+            : new System.Windows.Media.SolidColorBrush(WpfColor.FromRgb(58, 63, 75));
+        PinGlyph.Stroke = pinned
+            ? new System.Windows.Media.SolidColorBrush(WpfColor.FromRgb(126, 207, 176))
+            : new System.Windows.Media.SolidColorBrush(WpfColor.FromRgb(142, 150, 168));
+        PinGlyph.Fill = pinned
+            ? new System.Windows.Media.SolidColorBrush(WpfColor.FromRgb(70, 143, 119))
+            : WpfBrushes.Transparent;
     }
 
     public void SetBridgeState(string state)
