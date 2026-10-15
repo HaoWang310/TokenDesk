@@ -93,8 +93,13 @@ public partial class App : System.Windows.Application
         if (!_window.IsVisible) _window.Show();
         if (_window.WindowState == WindowState.Minimized) _window.WindowState = WindowState.Normal;
         _window.Activate();
-        _window.Topmost = true;
-        _window.Topmost = false;
+        // Only apply a temporary z-order bump if the user has NOT pinned
+        // the dashboard. Never undo the stored always-on-top preference.
+        if (!_window.Topmost)
+        {
+            _window.Topmost = true;
+            _window.Topmost = false;
+        }
     }
 
     public void ExitApplication()
