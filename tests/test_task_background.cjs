@@ -29,6 +29,8 @@ function sendTask(active,model=''){
 (async()=>{
   sendTask(true); await new Promise(r=>setTimeout(r,250));
   assert(lastTaskBody); assert.strictEqual(lastTaskBody.tasks.length,1); assert.strictEqual(lastTaskBody.tasks[0].title,'Long analysis'); assert.strictEqual(lastTaskBody.tasks[0].phase,'thinking');
+  assert.strictEqual(lastTaskBody.tasks[0].model,'未识别（未收到模型标识）',
+    'macOS must show explicit unrecognized status instead of hiding its model line');
   sendTask(true,'请求模型：gpt-6-thinking');
   await new Promise(r=>setTimeout(r,250));
   assert.strictEqual(lastTaskBody.tasks[0].model,'请求模型：gpt-6-thinking');
