@@ -1,3 +1,11 @@
+## Mac v1.8.12 · Intel 与 Apple M 系列共用安装包
+
+- **Intel Mac（x86_64）**：安装时自动编译为 x86_64 原生程序。
+- **Apple M 系列（arm64）**：安装时自动编译为 arm64 原生程序。即使 Terminal 开启 Rosetta 翻译模式，安装器也会正确识别并选择 arm64。
+- **同一份 ZIP 适用于两类芯片**，无需分别下载；注意 ZIP 是包含 Swift 源码的本机编译安装包，不是预编译 Universal Binary 应用。需要 Apple Command Line Tools（Swift 5.5 或更新）和 macOS 12 或更高版本。
+- 编译时明确传入 macOS SDK 路径，避免缺失 Swift 标准库；生成后自动使用 `lipo -verify_arch` 检查 App 架构。GitHub Actions 独立对 x86_64 与 arm64 完整 SwiftUI 应用执行目标编译及架构验证。
+- 保留原来的本机额度历史、配对码、今天/本周时长及 Chrome 扩展功能，不主动重置统计。应用仍采用本地 ad-hoc 签名，**没有 Apple Developer ID 公证**；请核验 GitHub 来源、阅读安装脚本后再执行，不要全局关闭 Gatekeeper。
+
 ## Mac v1.8.11：本周使用时间显示与重启保留
 
 Mac 桌面面板在“剩余额度”下方直接显示“今天使用时长 / 本周累计时长”，并在菜单栏图标的下拉菜单增加两项相同数据；每日柱状图仍可往下滚动查看。Mac 会将浏览器扩展收到的最近每日时长在本机缓存，重启无需等下一次同步才能看到。周一 00:00 自动只展示新的自然周（周一至周日），不会更改 ChatGPT 官方的额度重置周期。使用数据仍需要 Chrome / Edge 扩展主动采集；安装前未记录的历史时长无法补录。现有配对码和历史记录保留。
@@ -70,7 +78,7 @@ Windows 第一版已经加入同一 GitHub 仓库：
 
 Windows 详细说明见 [Windows/README.md](Windows/README.md)。
 
-## macOS v1.8.11 更新
+## macOS v1.8.12 更新
 
 - 统计每天 ChatGPT 主动使用时间；
 - 使用时间定义为：ChatGPT 标签页处于前台，并且最近 5 分钟内有键盘、鼠标、滚动等交互；
