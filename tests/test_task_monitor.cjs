@@ -159,6 +159,13 @@ sandbox.location.pathname='/c/another';
 sandbox.location.href='https://chatgpt.com/c/another';
 sandbox.document.querySelectorAll=()=>[];
 sandbox.__TOKEN_DESK_TASK_TEST_SEND__(true); // finish the prior SPA route transition
+// A generation POST starts the task immediately, even when the server has not
+// responded with stream headers or ChatGPT has not shown a Stop button.
+windowListeners.message({source:pageWindow,origin:'https://chatgpt.com',
+  data:{channel:'TOKEN_DESK_NETWORK_V1',type:'TASK_REQUEST',status:'started',route:'/c/another'}});
+assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.active,true,
+  'conversation POST initiation must activate task before SSE headers');
+assert.strictEqual(messages.filter(m=>m.type==='TOKEN_DESK_TASK_STATE').at(-1).payload.completionVerified,false);
 windowListeners.message({source:pageWindow,origin:'https://chatgpt.com',
   data:{channel:'TOKEN_DESK_NETWORK_V1',type:'TASK_STREAM',status:'open',route:'/c/another'}});
 assert.strictEqual(sandbox.__TOKEN_DESK_TASK_TEST_ACTIVE_PHASE__(),'working');
