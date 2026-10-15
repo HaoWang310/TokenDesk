@@ -583,7 +583,10 @@ async function sendTasksSnapshot() {
     usageDays,
     tasks: tasks.map(t=>({
       id:t.id,phase:t.phase === 'unverified' ? 'unverified' : (t.phase === 'thinking' ? 'thinking' : 'working'),
-      model:t.model || '',
+      // Keep the true model source unchanged in taskStates. Use a UI-only
+      // placeholder so existing macOS clients never silently hide this row.
+      // Unknown is NOT a model inference and never enters the model cache.
+      model:t.model || '未识别（未收到模型标识）',
       title:t.title || 'ChatGPT 任务',pageURL:t.pageURL,
       startedAt:Math.floor(t.startedAt/1000),lastSeenAt:Math.floor(t.lastSeenAt/1000)
     }))
