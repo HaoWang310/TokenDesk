@@ -51,6 +51,22 @@ jobs:
             QuotaModels.swift BrowserUsage.swift BrowserBridge.swift TokenDeskApp.swift \
             -framework SwiftUI -framework AppKit -framework Network -framework UserNotifications
 
+      - name: Smoke test installer macOS SDK targeting
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_PATH="$(xcrun --sdk macosx --show-sdk-path)"
+          test -d "$SDK_PATH"
+          # This is the exact kind of target-specific Swift compile that failed
+          # on macOS 15.7.7 / Apple Silicon without an explicit -sdk argument.
+          printf 'import Foundation\nprint("SDK compile OK")\n' > /tmp/tokendesk-sdk-smoke.swift
+          xcrun --sdk macosx swiftc -target "$(uname -m)-apple-macosx12.0" \
+            -sdk "$SDK_PATH" /tmp/tokendesk-sdk-smoke.swift \
+            -o /tmp/tokendesk-sdk-smoke
+          /tmp/tokendesk-sdk-smoke
+          grep -Fq -- '-sdk "$SDK_PATH"' install.command
+          grep -Fq -- 'exec /bin/bash "$DIR/install.command"' 安装到Mac.command
+
       - name: Generate app icon assets
         shell: bash
         run: |
