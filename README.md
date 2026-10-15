@@ -23,7 +23,7 @@ Current data path:
 
 After the first pairing, Chrome can stay in the background. You do **not** need to keep ChatGPT or the Usage page open.
 
-## Current macOS version: v1.8.11
+## Current macOS version: v1.8.12
 
 v1.8.5 improves active-task classification and distinguishes confirmed live web tasks from unverified last-known tasks when a ChatGPT tab closes. Unverified tasks are cached locally for up to two hours and restored after a Chrome extension service-worker restart. This does not verify that cloud tasks are still running after the page closes. Chrome extension v1.8.7 is required.
 
@@ -37,7 +37,7 @@ v1.8.1 synchronizes ChatGPT's current composer model/mode selector support (GPT-
 
 “Active time” means a ChatGPT tab is in the foreground and has had user interaction within the last five minutes. “Daily usage” is the drop in the weekly remaining quota, measured in percentage points; it is not a token count.
 
-v1.8.0 uses one architecture-adaptive installer for Intel x86_64 and Apple Silicon arm64, with a macOS 12.0 deployment target and Swift 5.5+ source compatibility.
+v1.8.12 packages one source-based local installer for Intel x86_64 and Apple Silicon arm64. It selects an arm64 native build even from a translated Rosetta Terminal, checks the compiled architecture, and uses an explicit macOS SDK. GitHub Actions separately cross-compiles the complete SwiftUI app for both targets (macOS 12 minimum, Swift 5.5+). This is not a prebuilt Universal Binary.
 
 v1.8.0 adds macOS 12 Monterey / Intel x86_64 local-build compatibility and fixes Swift closure-capture compilation on older toolchains.
 
