@@ -689,6 +689,7 @@ private struct QuotaHistorySection: View {
 private struct TokenDeskHeader: View {
     @ObservedObject var model: TokenModel
     let hideWindow: () -> Void
+    let setPinned: (Bool) -> Void
 
     private var statusColor: Color {
         if model.browserIsFresh { return .green }
@@ -716,6 +717,18 @@ private struct TokenDeskHeader: View {
             Text(statusText)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(.white.opacity(0.7))
+            Button(action: { setPinned(!model.pinned) }) {
+                Image(systemName: model.pinned ? "pin.fill" : "pin")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(model.pinned
+                        ? Color(red: 0.44, green: 0.90, blue: 0.76)
+                        : .white.opacity(0.66))
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(model.pinned ? "已固定在最前 · 点击取消" : "固定窗口 · 始终显示在其他应用前")
+            .accessibilityLabel(model.pinned ? "取消窗口置顶" : "固定窗口置顶")
             Button(action: { model.showSettings.toggle() }) {
                 Image(systemName: model.showSettings ? "chart.bar.xaxis" : "gearshape")
             }
@@ -1279,7 +1292,7 @@ private struct TokenDeskView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            TokenDeskHeader(model: model, hideWindow: hideWindow)
+            TokenDeskHeader(model: model, hideWindow: hideWindow, setPinned: setPinned)
             TokenDeskScrollContent(model: model, setPinned: setPinned, setOpacity: setOpacity)
             TokenDeskFooter(text: footerText)
         }
@@ -1341,7 +1354,9 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
         panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.isMovableByWindowBackground = true
-        panel.level = model.pinned ? .floating : .normal
+        // Pinned utility panel stays above ordinary and floating app windows.
+        // macOS still controls system alerts, lock screen and protected spaces.
+        panel.level = model.pinned ? .statusBar : .normal
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.alphaValue = model.opacity
         panel.standardWindowButton(.closeButton)?.isHidden = true
@@ -1351,7 +1366,7 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
             model: model,
             hideWindow: { [weak self] in self?.hidePanel() },
             setPinned: { [weak self] value in
-                self?.panel.level = value ? .floating : .normal
+                self?.setWindowPinned(value)
             },
             setOpacity: { [weak self] value in self?.panel.alphaValue = value }
         ))
@@ -1535,13 +1550,25 @@ private final class TokenDeskDelegate: NSObject, NSApplicationDelegate, NSMenuDe
         return clampedFrame(fresh, on: target)
     }
 
+    private func setWindowPinned(_ pinned: Bool) {
+        model.pinned = pinned // Persists via TokenModel.pinned.didSet
+        guard panel != nil else { return }
+        panel.level = pinned ? .statusBar : .normal
+        panel.hidesOnDeactivate = false
+        // No focus stealing during ordinary updates. Clicking the actual
+        // pin is a user action and may bring the panel forward immediately.
+        if pinned && panel.isVisible {
+            panel.orderFrontRegardless()
+        }
+    }
+
     private func presentPanel(resetPosition: Bool = false) {
         guard panel != nil else { return }
         let frame = resolvedPanelFrame(restorePosition: !resetPosition)
         model.panelHeight = frame.height
         panel.setFrame(frame, display: true, animate: false)
         panel.hidesOnDeactivate = false
-        panel.level = model.pinned ? .floating : .normal
+        panel.level = model.pinned ? .statusBar : .normal
         panel.alphaValue = model.opacity
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
